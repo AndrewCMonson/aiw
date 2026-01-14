@@ -41,6 +41,54 @@ describe("aiw setup", () => {
             expect(await exists(path.join(dir, ".ai", "context", "pr_reviews", "README.md"))).toBe(true);
             expect(await exists(path.join(dir, ".ai", "context", "feature_plans", "README.md"))).toBe(true);
             expect(await exists(path.join(dir, ".ai", "context", "debug_notes", "README.md"))).toBe(true);
+            expect(await exists(path.join(dir, ".ai", "context", "pr_reviews", "_example.md"))).toBe(true);
+            expect(await exists(path.join(dir, ".ai", "context", "feature_plans", "_example.md"))).toBe(true);
+            expect(await exists(path.join(dir, ".ai", "context", "debug_notes", "_example.md"))).toBe(true);
+
+            // docs/PROJECT_CONTEXT.md should be created by default
+            expect(await exists(path.join(dir, "docs", "PROJECT_CONTEXT.md"))).toBe(true);
+        } finally {
+            process.chdir(cwd);
+        }
+    });
+
+    it("scaffolds agent rules with --with-agents", async () => {
+        const dir = await makeTempDir();
+        const cwd = process.cwd();
+        try {
+            process.chdir(dir);
+            await runSetup({ workspace: ".ai", force: false, gitignoreMode: "skip", withAgents: true });
+
+            expect(await exists(path.join(dir, "AGENTS.md"))).toBe(true);
+            expect(await exists(path.join(dir, "CLAUDE.md"))).toBe(true);
+            expect(await exists(path.join(dir, ".cursor", "rules", "00-core.mdc"))).toBe(true);
+            expect(await exists(path.join(dir, ".cursor", "rules", "10-frontend.mdc"))).toBe(true);
+            expect(await exists(path.join(dir, ".cursor", "rules", "20-backend.mdc"))).toBe(true);
+            expect(await exists(path.join(dir, "docs", "PROJECT_CONTEXT.md"))).toBe(true);
+        } finally {
+            process.chdir(cwd);
+        }
+    });
+
+    it("installs pre-push hook with --with-hooks", async () => {
+        const dir = await makeTempDir();
+        const cwd = process.cwd();
+        try {
+            process.chdir(dir);
+            // Initialize git repo
+            const { execSync } = await import("node:child_process");
+            execSync("git init", { cwd: dir });
+            execSync("git config user.email 'test@example.com'", { cwd: dir });
+            execSync("git config user.name 'Test User'", { cwd: dir });
+
+            await runSetup({ workspace: ".ai", force: false, gitignoreMode: "skip", withHooks: true });
+
+            const hookPath = path.join(dir, ".git", "hooks", "pre-push");
+            expect(await exists(hookPath)).toBe(true);
+
+            // Check hook content
+            const content = await fs.readFile(hookPath, "utf8");
+            expect(content).toContain("aiw context:verify");
         } finally {
             process.chdir(cwd);
         }
@@ -59,6 +107,29 @@ describe("aiw setup", () => {
             await runSetup({ workspace: ".ai", force: false, gitignoreMode: "skip" });
             const after = await fs.readFile(promptPath, "utf8");
             expect(after).toBe("SENTINEL\n");
+        } finally {
+            process.chdir(cwd);
+        }
+    });
+
+    it("does not overwrite existing docs/PROJECT_CONTEXT.md without --force", async () => {
+        const dir = await makeTempDir();
+        const cwd = process.cwd();
+        try {
+            process.chdir(dir);
+
+            // Create docs folder with existing PROJECT_CONTEXT.md
+            const docsDir = path.join(dir, "docs");
+            await fs.mkdir(docsDir, { recursive: true });
+            const projectContextPath = path.join(docsDir, "PROJECT_CONTEXT.md");
+            await fs.writeFile(projectContextPath, "EXISTING CONTENT\n", "utf8");
+
+            // Run setup
+            await runSetup({ workspace: ".ai", force: false, gitignoreMode: "skip" });
+
+            // Verify it was not overwritten
+            const after = await fs.readFile(projectContextPath, "utf8");
+            expect(after).toBe("EXISTING CONTENT\n");
         } finally {
             process.chdir(cwd);
         }

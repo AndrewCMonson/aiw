@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { contextVerifyCommand } from "./commands/contextVerify.js";
 import { copyCommand } from "./commands/copy.js";
 import { listCommand } from "./commands/list.js";
 import { newCommand } from "./commands/new.js";
@@ -36,6 +37,7 @@ program.addCommand(showCommand());
 program.addCommand(copyCommand());
 program.addCommand(openCommand());
 program.addCommand(newCommand());
+program.addCommand(contextVerifyCommand());
 
 program.parseAsync(process.argv).catch((err) => {
     // Commander will already have printed user-facing help/errors for most cases.

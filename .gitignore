@@ -53,4 +53,9 @@ Desktop.ini
 *.tmp
 *.temp
 .cache/
+
+
+.cursor/
+
+# AI
 .ai/

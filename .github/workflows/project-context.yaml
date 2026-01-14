@@ -1,0 +1,36 @@
+name: Project Context Check
+
+on:
+  pull_request:
+
+jobs:
+  project-context:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enforce docs/PROJECT_CONTEXT.md update when meaningful files change
+        run: |
+          TEAM_DOC="docs/PROJECT_CONTEXT.md"
+          RANGE="origin/${{ github.base_ref }}..HEAD"
+
+          # allow if [context-skip] appears in PR commits
+          if git log --format=%B "$RANGE" | grep -q "\[context-skip\]"; then
+            echo "Skip token found; passing."
+            exit 0
+          fi
+
+          files=$(git diff --name-only "$RANGE")
+
+          meaningful=$(echo "$files" | grep -vE '^(docs/|.*\.md$|\.ai/|\.cursor/)' || true)
+          teamdoc=$(echo "$files" | grep -F "$TEAM_DOC" || true)
+
+          if [ -n "$meaningful" ] && [ -z "$teamdoc" ]; then
+            echo "❌ Meaningful changes detected but $TEAM_DOC not updated."
+            echo "Run aiw project_refresh, update $TEAM_DOC, and commit the change."
+            exit 1
+          fi
+
+          echo "✅ Context requirements satisfied."
