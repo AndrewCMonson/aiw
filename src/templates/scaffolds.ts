@@ -95,7 +95,7 @@ export function scaffoldPromptMarkdown(opts: { slug: string; title?: string; fro
                 standardRules +
                 "## Goal\n- Understand this repository and capture durable context.\n\n" +
                 "## What to do\n- Inspect the repo structure, entrypoints, scripts, configs, and data flows.\n- Identify how to run, test, and build.\n- Note key modules, boundaries, and risks.\n\n" +
-                artifactSection(`${ws}/context/REPO_CONTEXT.md`) +
+                artifactSection(`${ws}/context/repo_context/REPO_CONTEXT.md`) +
                 "## Plan format\n- Plan steps\n- What files/commands will be used\n- What will be written to the artifact\n"
             );
         case "review":

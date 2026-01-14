@@ -13,9 +13,9 @@ export const DEFAULT_PROMPTS: DefaultPrompt[] = [
     {
         slug: "repo_discover",
         filename: "repo_discover.md",
-        contents: `# Repo discovery → write \`.ai/context/REPO_CONTEXT.md\`
+        contents: `# Repo discovery → write \`.ai/context/repo_context/REPO_CONTEXT.md\`
 
-**Goal:** Perform repo discovery and write/update a durable context artifact at \`.ai/context/REPO_CONTEXT.md\` that future AI work can rely on.
+**Goal:** Perform repo discovery and write/update a durable context artifact at \`.ai/context/repo_context/REPO_CONTEXT.md\` that future AI work can rely on.
 
 ---
 
@@ -37,7 +37,7 @@ export const DEFAULT_PROMPTS: DefaultPrompt[] = [
    - Deployment and release shape
    - Risk areas / footguns
 
-2. Write or update a durable context artifact at: .ai/context/REPO_CONTEXT.md
+2. Write or update a durable context artifact at: .ai/context/repo_context/REPO_CONTEXT.md
 
 ---
 
@@ -79,7 +79,7 @@ When approved, scan the repo in this order and capture notes:
 
 ## Output file format (required)
 
-Write or update \`.ai/context/REPO_CONTEXT.md\` using **exactly** the structure below.
+Write or update \`.ai/context/repo_context/REPO_CONTEXT.md\` using **exactly** the structure below.
 
 > Include **evidence tags** for key claims where possible  
 > (e.g. \`Evidence: package.json\`, \`Evidence: docker-compose.yml\`)
@@ -159,9 +159,9 @@ Respond with **only**:
     {
         slug: "repo_refresh",
         filename: "repo_refresh.md",
-        contents: `# Repo refresh → update .ai/context/REPO_CONTEXT.md (with deltas)
+        contents: `# Repo refresh → update .ai/context/repo_context/REPO_CONTEXT.md (with deltas)
 
-**Goal:** Refresh \`.ai/context/REPO_CONTEXT.md\` to match the current repo state, and clearly capture *what changed* since the last update.
+**Goal:** Refresh \`.ai/context/repo_context/REPO_CONTEXT.md\` to match the current repo state, and clearly capture *what changed* since the last update.
 
 ---
 
@@ -175,9 +175,9 @@ Respond with **only**:
 ---
 
 ## Your task
-1. Read the current \`.ai/context/REPO_CONTEXT.md\` and note its **Last updated** date (or infer "last refresh" from the newest delta section if present).
+1. Read the current \`.ai/context/repo_context/REPO_CONTEXT.md\` and note its **Last updated** date (or infer "last refresh" from the newest delta section if present).
 2. Inspect the repo to determine what has changed since that date.
-3. Update \`.ai/context/REPO_CONTEXT.md\` so it is accurate **and** includes a concise delta section at the top.
+3. Update \`.ai/context/repo_context/REPO_CONTEXT.md\` so it is accurate **and** includes a concise delta section at the top.
 
 ---
 
@@ -207,7 +207,7 @@ When approved, prioritize changes that affect how engineers work in this repo:
 
 ## Artifact output (required)
 
-Update \`.ai/context/REPO_CONTEXT.md\` and add/refresh a top section:
+Update \`.ai/context/repo_context/REPO_CONTEXT.md\` and add/refresh a top section:
 
 ### What changed since last refresh (YYYY-MM-DD → YYYY-MM-DD)
 - Change 1 (with evidence)

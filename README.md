@@ -65,7 +65,8 @@ Creates the workspace structure and writes the default prompt set:
     feature_plan.md
     debug_senior.md
   context/
-    REPO_CONTEXT.md
+    repo_context/
+      REPO_CONTEXT.md
     pr_reviews/
       YYYY-MM-DD_HHMMSS_<id>_<descriptor>.md
     feature_plans/

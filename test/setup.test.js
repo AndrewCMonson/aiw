@@ -23,10 +23,15 @@ describe("aiw setup", () => {
             expect(await exists(path.join(dir, ".ai", "prompts"))).toBe(true);
             expect(await exists(path.join(dir, ".ai", "prompts", "repo_discover.md"))).toBe(true);
             expect(await exists(path.join(dir, ".ai", "context"))).toBe(true);
-            expect(await exists(path.join(dir, ".ai", "context", "REPO_CONTEXT.md"))).toBe(true);
+            expect(await exists(path.join(dir, ".ai", "context", "repo_context"))).toBe(true);
+            expect(await exists(path.join(dir, ".ai", "context", "repo_context", "REPO_CONTEXT.md"))).toBe(true);
+            expect(await exists(path.join(dir, ".ai", "context", "repo_context", "README.md"))).toBe(true);
             expect(await exists(path.join(dir, ".ai", "context", "pr_reviews"))).toBe(true);
             expect(await exists(path.join(dir, ".ai", "context", "feature_plans"))).toBe(true);
             expect(await exists(path.join(dir, ".ai", "context", "debug_notes"))).toBe(true);
+            expect(await exists(path.join(dir, ".ai", "context", "pr_reviews", "README.md"))).toBe(true);
+            expect(await exists(path.join(dir, ".ai", "context", "feature_plans", "README.md"))).toBe(true);
+            expect(await exists(path.join(dir, ".ai", "context", "debug_notes", "README.md"))).toBe(true);
         } finally {
             process.chdir(cwd);
         }

@@ -191,7 +191,7 @@ export default defineConfig([
 
 			// TypeScript parser options for type checking and project context
 			parserOptions: {
-				project: 'tsconfig.json',
+				project: 'tsconfig.eslint.json',
 				tsconfigRootDir: __dirname,
 			},
 		},
