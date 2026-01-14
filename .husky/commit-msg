@@ -6,6 +6,12 @@ fi
 # Read commit message from file
 COMMIT_MSG=$(cat "$1")
 
+# Skip validation for version commits (from npm version)
+# Matches patterns like "0.1.1" or "v0.1.1"
+if echo "$COMMIT_MSG" | grep -qE "^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$"; then
+    exit 0
+fi
+
 # Validate commit message format:
 # - Jira format: ABC-123 - Description
 # - Conventional Commits: feat: description, fix(scope): description, etc.
