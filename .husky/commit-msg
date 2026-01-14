@@ -1,6 +1,3 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 # Skip validation for merge commits
 if echo "$1" | grep -q "^Merge"; then
     exit 0

@@ -1,6 +1,3 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 # Skip validation for merge commits
 if git log -1 --pretty=%B | grep -q "^Merge"; then
     exit 0
@@ -8,6 +5,13 @@ fi
 
 # Get current branch name
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Allow protected branches (main, master, develop) to bypass branch name validation
+if echo "$BRANCH" | grep -qE "^(main|master|develop)$"; then
+    # Run full linting before push
+    npm run lint
+    exit 0
+fi
 
 # Validate branch naming convention: feature/ABC-123 or feature/ABC-123-Description
 if ! echo "$BRANCH" | grep -qE "^feature/[A-Z]+-[0-9]+(-[a-zA-Z0-9-]+)?$"; then
