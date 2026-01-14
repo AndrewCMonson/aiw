@@ -23,10 +23,18 @@
         "format": "prettier --write \"src/**/*.{ts,tsx}\"",
         "lint": "eslint --ext .ts,.tsx src/",
         "lint:fix": "eslint --ext .ts,.tsx src/ --fix",
-        "prepare": "husky"
+        "prepare": "husky",
+        "prepublishOnly": "npm run build && npm test"
     },
-    "keywords": [],
-    "author": "",
+    "keywords": [
+        "cli",
+        "cursor",
+        "ai",
+        "prompt",
+        "workflow",
+        "productivity"
+    ],
+    "author": "Andrew Monson",
     "private": false,
     "dependencies": {
         "commander": "^14.0.2"

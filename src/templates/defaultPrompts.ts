@@ -1,14 +1,19 @@
+/**
+ * @copyright Copyright © 2025 Andrew Monson. All rights reserved.
+ * @author    Andrew Monson <andrew.monson@elevate-digital.com>
+ */
+
 export type DefaultPrompt = {
-  slug: string;
-  filename: string;
-  contents: string;
+    slug: string;
+    filename: string;
+    contents: string;
 };
 
 export const DEFAULT_PROMPTS: DefaultPrompt[] = [
-  {
-    slug: "repo_discover",
-    filename: "repo_discover.md",
-    contents: `# Repo discovery → write \`.ai/context/REPO_CONTEXT.md\`
+    {
+        slug: "repo_discover",
+        filename: "repo_discover.md",
+        contents: `# Repo discovery → write \`.ai/context/REPO_CONTEXT.md\`
 
 **Goal:** Perform repo discovery and write/update a durable context artifact at \`.ai/context/REPO_CONTEXT.md\` that future AI work can rely on.
 
@@ -149,12 +154,12 @@ Respond with **only**:
 
 2. **STOP**
    - Ask for explicit approval to execute
-`
-  },
-  {
-    slug: "repo_refresh",
-    filename: "repo_refresh.md",
-    contents: `# Repo refresh → update .ai/context/REPO_CONTEXT.md (with deltas)
+`,
+    },
+    {
+        slug: "repo_refresh",
+        filename: "repo_refresh.md",
+        contents: `# Repo refresh → update .ai/context/REPO_CONTEXT.md (with deltas)
 
 **Goal:** Refresh \`.ai/context/REPO_CONTEXT.md\` to match the current repo state, and clearly capture *what changed* since the last update.
 
@@ -233,12 +238,12 @@ Then update the rest of the document as needed to stay accurate.
 Respond with **only**:
 1. Plan (what you will inspect, and how you will update the artifact)
 2. STOP and ask for approval
-`
-  },
-  {
-    slug: "pre_push_review",
-    filename: "pre_push_review.md",
-    contents: `# Pre-push review → write .ai/context/pr_reviews/YYYY-MM-DD_HHMMSS_<id>_<descriptor>.md
+`,
+    },
+    {
+        slug: "pre_push_review",
+        filename: "pre_push_review.md",
+        contents: `# Pre-push review → write .ai/context/pr_reviews/YYYY-MM-DD_HHMMSS_<id>_<descriptor>.md
 
 ## Operating rules (critical)
 - PLAN FIRST: produce a step-by-step plan before running commands or editing files.
@@ -304,12 +309,12 @@ Write to \`.ai/context/pr_reviews/YYYY-MM-DD_HHMMSS_<id>_<descriptor>.md\` with:
 ## Plan-first response format
 1. Plan (how you will inspect changes and what you will write)
 2. STOP and ask for approval
-`
-  },
-  {
-    slug: "feature_plan",
-    filename: "feature_plan.md",
-    contents: `# Feature planning (senior) → write .ai/context/feature_plans/YYYY-MM-DD_HHMMSS_<id>_<descriptor>.md
+`,
+    },
+    {
+        slug: "feature_plan",
+        filename: "feature_plan.md",
+        contents: `# Feature planning (senior) → write .ai/context/feature_plans/YYYY-MM-DD_HHMMSS_<id>_<descriptor>.md
 
 ## Operating rules (critical)
 - PLAN FIRST: produce a step-by-step plan before running commands or editing files.
@@ -449,12 +454,12 @@ Write to \`.ai/context/feature_plans/YYYY-MM-DD_HHMMSS_<id>_<descriptor>.md\` wi
 1. Clarifying questions (if needed)
 2. Plan (steps and file-by-file)
 3. STOP and ask for approval
-`
-  },
-  {
-    slug: "debug_senior",
-    filename: "debug_senior.md",
-    contents: `# Debugging assistant (senior) → write .ai/context/debug_notes/YYYY-MM-DD_HHMMSS_<id>_<descriptor>.md
+`,
+    },
+    {
+        slug: "debug_senior",
+        filename: "debug_senior.md",
+        contents: `# Debugging assistant (senior) → write .ai/context/debug_notes/YYYY-MM-DD_HHMMSS_<id>_<descriptor>.md
 
 ## Operating rules (critical)
 - PLAN FIRST: produce a step-by-step plan before running commands or editing files.
@@ -573,6 +578,6 @@ Write to \`.ai/context/debug_notes/YYYY-MM-DD_HHMMSS_<id>_<descriptor>.md\` with
 ## Plan-first response format
 1. Plan (what info you'll need and what you'll check)
 2. STOP and ask for approval
-`
-  }
+`,
+    },
 ];

@@ -90,7 +90,7 @@ export default defineConfig([
 			'notice/notice': [
 				'error',
 				{
-					mustMatch: String.raw`^/\*\*\r?\n \* @copyright Copyright © .+?\. All rights reserved\.\r?\n \* @author    .+? <[^>]+>\r?\n \*/`,
+					mustMatch: String.raw`^(#!/usr/bin/env node\r?\n)?/\*\*\r?\n \* @copyright Copyright © .+?\. All rights reserved\.\r?\n \* @author    .+? <[^>]+>\r?\n \*/`,
 				},
 			],
 

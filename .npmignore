@@ -1,0 +1,53 @@
+# Source files
+src/
+test/
+
+# Build artifacts (only dist/ should be published)
+*.tsbuildinfo
+
+# Development tools and configs
+.husky/
+scripts/
+.eslintrc*
+eslint.config.*
+.prettierrc*
+.prettierignore
+.lintstagedrc*
+vitest.config.*
+tsconfig.json
+
+# Development dependencies
+node_modules/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# AI/Editor specific (this is what the CLI manages, not part of the package)
+.ai/
