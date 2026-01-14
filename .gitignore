@@ -53,6 +53,4 @@ Desktop.ini
 *.tmp
 *.temp
 .cache/
-
-# AI/Editor specific
 .ai/

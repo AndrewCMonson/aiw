@@ -1,5 +1,5 @@
 {
-    "name": "@amdev/aiw",
+    "name": "@andrewmonson/aiw",
     "version": "0.1.0",
     "description": "Repo-local prompt library CLI for Cursor workflows",
     "license": "MIT",
@@ -36,6 +36,10 @@
     ],
     "author": "Andrew Monson",
     "private": false,
+    "publishConfig": {
+        "access": "public",
+        "registry": "https://registry.npmjs.org/"
+    },
     "dependencies": {
         "commander": "^14.0.2"
     },

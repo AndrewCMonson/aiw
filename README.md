@@ -9,14 +9,14 @@ The prompts are meant to be **pasted into Cursor chat manually** (the CLI does n
 - Global install:
 
 ```bash
-npm i -g @amdev/aiw
+npm i -g @andrewmonson/aiw
 aiw --help
 ```
 
 - Run via `npx` (no install):
 
 ```bash
-npx @amdev/aiw --help
+npx @andrewmonson/aiw --help
 ```
 
 ## Quick start
@@ -48,6 +48,7 @@ aiw copy repo_discover
 ## Commands
 
 All commands support:
+
 - **`--workspace <path>`**: the workspace folder (default: `.ai`)
 
 ### `aiw setup`
@@ -74,16 +75,19 @@ Creates the workspace structure and writes the default prompt set:
 ```
 
 Idempotency:
+
 - By default, **existing files are not overwritten**.
 - Use **`--force`** to overwrite managed files (a timestamped backup is created next to the original).
 
 **Note:** Context files (`pr_reviews/`, `feature_plans/`, `debug_notes/`) are versioned with timestamps, unique IDs, and descriptors (including git branch names for features/bugs). Each prompt execution creates a new file instead of overwriting previous ones.
 
 `.gitignore` behavior:
+
 - By default, `setup` **prompts** (only in an interactive TTY) to add the workspace folder to `.gitignore`.
 - For non-interactive usage, pass **`--gitignore add`** or **`--gitignore skip`**.
 
 Flags:
+
 - `--force`
 - `--gitignore prompt|add|skip`
 - `--workspace <path>`
@@ -99,6 +103,7 @@ Prints the prompt contents to stdout.
 ### `aiw copy <prompt>`
 
 Copies the prompt contents to clipboard using OS tooling:
+
 - macOS: `pbcopy`
 - Windows: `clip`
 - Linux: tries `wl-copy`, then `xclip`, then `xsel`
@@ -108,6 +113,7 @@ If no clipboard tool is available, it prints the prompt to stdout with a friendl
 ### `aiw open <prompt>`
 
 Attempts to open the prompt file in the OS default editor/viewer:
+
 - macOS: `open`
 - Windows: `start`
 - Linux: `xdg-open`
@@ -119,6 +125,7 @@ If open fails, it prints the absolute path.
 Creates a new prompt file at `<workspace>/prompts/<slug>.md`.
 
 Flags:
+
 - `--title "<human title>"`
 - `--from blank|repo|review|feature|debug`
 - `--open`
@@ -127,6 +134,7 @@ Flags:
 ## Prompt design
 
 The included prompts are:
+
 - Tech-stack agnostic
 - Plan-first (Cursor must plan then stop for approval)
 - Safe (no secrets / no env var values)
@@ -178,4 +186,3 @@ aiw list
 # To remove the link:
 npm run unlink
 ```
-

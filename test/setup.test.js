@@ -7,8 +7,7 @@ async function exists(p) {
     try {
         await fs.access(p);
         return true;
-    }
-    catch {
+    } catch {
         return false;
     }
 }
@@ -23,12 +22,12 @@ describe("aiw setup", () => {
             expect(await exists(path.join(dir, ".ai", "README.md"))).toBe(true);
             expect(await exists(path.join(dir, ".ai", "prompts"))).toBe(true);
             expect(await exists(path.join(dir, ".ai", "prompts", "repo_discover.md"))).toBe(true);
-            expect(await exists(path.join(dir, ".ai", "REPO_CONTEXT.md"))).toBe(true);
-            expect(await exists(path.join(dir, ".ai", "PR_REVIEW.md"))).toBe(true);
-            expect(await exists(path.join(dir, ".ai", "FEATURE_PLAN.md"))).toBe(true);
-            expect(await exists(path.join(dir, ".ai", "DEBUG_NOTES.md"))).toBe(true);
-        }
-        finally {
+            expect(await exists(path.join(dir, ".ai", "context"))).toBe(true);
+            expect(await exists(path.join(dir, ".ai", "context", "REPO_CONTEXT.md"))).toBe(true);
+            expect(await exists(path.join(dir, ".ai", "context", "pr_reviews"))).toBe(true);
+            expect(await exists(path.join(dir, ".ai", "context", "feature_plans"))).toBe(true);
+            expect(await exists(path.join(dir, ".ai", "context", "debug_notes"))).toBe(true);
+        } finally {
             process.chdir(cwd);
         }
     });
@@ -43,8 +42,7 @@ describe("aiw setup", () => {
             await runSetup({ workspace: ".ai", force: false, gitignoreMode: "skip" });
             const after = await fs.readFile(promptPath, "utf8");
             expect(after).toBe("SENTINEL\n");
-        }
-        finally {
+        } finally {
             process.chdir(cwd);
         }
     });
