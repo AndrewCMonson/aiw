@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Skip validation for merge commits
+if echo "$1" | grep -q "^Merge"; then
+    exit 0
+fi
+
+# Read commit message from file
+COMMIT_MSG=$(cat "$1")
+
+# Validate commit message format:
+# - Jira format: ABC-123 - Description
+# - Conventional Commits: feat: description, fix(scope): description, etc.
+if ! echo "$COMMIT_MSG" | grep -qE "^([A-Z]+-[0-9]+ - .+|(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\(.+\))?: .+)"; then
+    echo "Error: Commit message must follow one of these formats:"
+    echo "  - Jira format: ABC-123 - Description"
+    echo "  - Conventional Commits: feat: description, fix(scope): description, etc."
+    echo ""
+    echo "Your commit message:"
+    echo "$COMMIT_MSG"
+    exit 1
+fi

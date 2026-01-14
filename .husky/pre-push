@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Skip validation for merge commits
+if git log -1 --pretty=%B | grep -q "^Merge"; then
+    exit 0
+fi
+
+# Get current branch name
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Validate branch naming convention: feature/ABC-123 or feature/ABC-123-Description
+if ! echo "$BRANCH" | grep -qE "^feature/[A-Z]+-[0-9]+(-[a-zA-Z0-9-]+)?$"; then
+    echo "Error: Branch name must follow pattern: feature/ABC-123 or feature/ABC-123-Description"
+    echo "Current branch: $BRANCH"
+    exit 1
+fi
+
+# Run full linting before push
+npm run lint
