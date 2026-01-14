@@ -1,4 +1,4 @@
-# `@amdev/aiw` — repo-local prompt library CLI
+# `@andrewmonson/aiw` — repo-local prompt library CLI
 
 This repo contains **`aiw`**, a small cross-platform CLI that manages a repo-local **prompt library** under **`.ai/`**.
 
