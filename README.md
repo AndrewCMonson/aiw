@@ -2,7 +2,7 @@
 
 This repo contains **`aiw`**, a small cross-platform CLI that manages a repo-local **prompt library** under **`.ai/`**.
 
-The prompts are meant to be **pasted into Cursor chat manually** (the CLI does not execute prompts).
+Prompts can be **copied to clipboard** for manual pasting, or **executed directly** via Cursor Agent CLI.
 
 ## Install / run
 
@@ -43,6 +43,12 @@ Copy to clipboard (falls back to printing if clipboard tools aren’t available)
 
 ```bash
 aiw copy repo_discover
+```
+
+Run directly via Cursor Agent (interactive mode):
+
+```bash
+aiw run repo_discover -i
 ```
 
 ## Commands
@@ -133,6 +139,49 @@ Flags:
 - `--from blank|repo|review|feature|debug`
 - `--open`
 - `--force` (overwrite safely; backs up first)
+
+### `aiw run <prompt>`
+
+Runs a prompt via Cursor Agent CLI. The prompt is pasted into the agent's input field.
+
+```bash
+# Interactive mode (recommended) - allows back-and-forth with the agent
+aiw run repo_discover -i
+
+# With a specific model
+aiw run repo_discover -i -m sonnet-4.5
+
+# Non-interactive print mode (for scripting)
+aiw run repo_discover -p
+```
+
+In interactive mode (`-i`), press **Enter** to submit the prompt, then continue interacting with the agent normally.
+
+Flags:
+
+- `-i, --interactive` - Interactive mode (allows typing responses, approving plans)
+- `-m, --model <model>` - Model to use (see below for available models)
+- `-p, --print` - Print mode (non-interactive, for scripting)
+- `--output-format <format>` - Output format for print mode: `text` or `json`
+- `--workspace <path>` - Workspace folder (default: `.ai`)
+
+**Available models:**
+
+- `auto` - Let Cursor pick the best model
+- `opus-4.5-thinking` - Claude 4.5 Opus with thinking (default)
+- `opus-4.5` - Claude 4.5 Opus
+- `sonnet-4.5` - Claude 4.5 Sonnet
+- `sonnet-4.5-thinking` - Claude 4.5 Sonnet with thinking
+- `gpt-5.2` - GPT-5.2
+- `gemini-3-pro` - Gemini 3 Pro
+- `gemini-3-flash` - Gemini 3 Flash
+
+Run `cursor agent --list-models` for the full list of available models.
+
+**Requirements:**
+
+- Cursor must be installed with the `cursor` CLI command available in PATH
+- The `expect` command must be available (included by default on macOS; on Linux: `apt install expect`)
 
 ### `aiw context:verify`
 

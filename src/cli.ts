@@ -14,6 +14,7 @@ import { copyCommand } from "./commands/copy.js";
 import { listCommand } from "./commands/list.js";
 import { newCommand } from "./commands/new.js";
 import { openCommand } from "./commands/open.js";
+import { runCommand } from "./commands/run.js";
 import { setupCommand } from "./commands/setup.js";
 import { showCommand } from "./commands/show.js";
 
@@ -37,6 +38,7 @@ program.addCommand(showCommand());
 program.addCommand(copyCommand());
 program.addCommand(openCommand());
 program.addCommand(newCommand());
+program.addCommand(runCommand());
 program.addCommand(contextVerifyCommand());
 
 program.parseAsync(process.argv).catch((err) => {
