@@ -1,0 +1,35 @@
+{
+  "name": "@amdev/aiw",
+  "version": "0.1.0",
+  "description": "Repo-local prompt library CLI for Cursor workflows",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "aiw": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "postbuild": "node scripts/postbuild.mjs",
+    "test": "vitest run",
+    "dev": "npm run build && node dist/cli.js",
+    "link": "npm unlink -g @amdev/aiw 2>/dev/null || true && npm link --force",
+    "unlink": "npm unlink -g @amdev/aiw"
+  },
+  "keywords": [],
+  "author": "",
+  "private": false,
+  "dependencies": {
+    "commander": "^14.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.8",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
