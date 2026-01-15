@@ -174,7 +174,7 @@ echo "  [y] Run self-review now (recommended)"
 echo "  [s] Skip this push by adding [aiw-skip] to commit message (amend and retry)"
 echo "  [n] Cancel push"
 printf "> "
-read -r response
+read -r response < /dev/tty
 
 case "$response" in
   [yY]|[yY][eE][sS])
