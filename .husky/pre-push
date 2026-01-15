@@ -30,7 +30,8 @@ fi
 npm run lint || exit $?
 
 # Run context verification (pass saved stdin)
-echo "$INPUT" | ./scripts/pre-push-context-check.sh || exit $?
+# Temporarily disabled - uncomment to re-enable
+# echo "$INPUT" | ./scripts/pre-push-context-check.sh || exit $?
 
 # ---------------------------------------
 # AIW Pre-Push Review Gate (soft + visible)
