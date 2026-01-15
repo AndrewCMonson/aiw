@@ -132,6 +132,34 @@ Write to `.ai/context/pr_reviews/YYYY-MM-DD_HHMMSS_<id>_<descriptor>.md` with:
 4. Pre-push checklist (tickable)
 5. Follow-ups (nice-to-haves)
 
+## Receipt file (required)
+
+After writing the review artifact, you MUST also create a receipt file at `.aiw/receipts/pre_push_review/<HEAD_SHA>.md`.
+
+1. Get the HEAD SHA by running `git rev-parse HEAD`
+2. Create the directory `.aiw/receipts/pre_push_review/` if it doesn't exist
+3. Write the receipt file with the following format:
+
+```markdown
+# AIW Pre-Push Review Receipt
+
+- Head SHA: <HEAD_SHA>
+- Branch: <branch-name or unknown>
+- Generated: <YYYY-MM-DD HH:MM:SS>
+- Local artifact: .ai/context/pr*reviews/YYYY-MM-DD_HHMMSS*<id>\_<descriptor>.md
+- Risk: <low|medium|high|(not found)>
+```
+
+Where:
+
+- `Head SHA`: The exact output of `git rev-parse HEAD`
+- `Branch`: The current branch name (from `git rev-parse --abbrev-ref HEAD` or user-provided)
+- `Generated`: Current timestamp in `YYYY-MM-DD HH:MM:SS` format
+- `Local artifact`: The relative path to the review file you just created
+- `Risk`: Extract from the review artifact's Summary section (look for "risk level" or similar), or "(not found)" if not found
+
+**Important**: Both files (review artifact and receipt) must be created for the session to auto-exit.
+
 ## Plan-first response format
 
 1. Plan (how you will inspect changes and what you will write)
