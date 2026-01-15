@@ -6,6 +6,13 @@ Prompts can be **copied to clipboard** for manual pasting, or **executed directl
 
 ## Install / run
 
+**Prerequisites:** Cursor must be installed with the `cursor` CLI command available in PATH. To install the Cursor CLI:
+
+1. Open Cursor
+2. Press `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows/Linux) to open the command palette
+3. Run `Install cursor command`
+4. Restart your terminal
+
 - Global install:
 
 ```bash
@@ -180,8 +187,12 @@ Run `cursor agent --list-models` for the full list of available models.
 
 **Requirements:**
 
-- Cursor must be installed with the `cursor` CLI command available in PATH
-- Node.js >= 20 (for native module support)
+- **Cursor CLI**: The `cursor` command must be available in your PATH. If you see an error when running `aiw`, install it by:
+    1. Opening Cursor
+    2. Pressing `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows/Linux) to open the command palette
+    3. Running `Install cursor command`
+    4. Restarting your terminal
+- **Node.js >= 20**: Required for native module support
 
 **Note:** This command uses `node-pty` for cross-platform pseudo-terminal support. On first install, native module compilation may occur, which requires standard build tools (these are typically pre-installed on most systems).
 

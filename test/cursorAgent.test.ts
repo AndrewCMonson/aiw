@@ -5,7 +5,13 @@
 
 import { describe, expect, it } from "vitest";
 
-import { buildCursorArgs, buildCursorCommand, validateModelName } from "../src/lib/cursorAgent.js";
+import {
+    buildCursorArgs,
+    buildCursorCommand,
+    findClosestModel,
+    validateModelName,
+    validateModelRecognition,
+} from "../src/lib/cursorAgent.js";
 
 describe("cursorAgent", () => {
     describe("validateModelName", () => {
@@ -54,6 +60,73 @@ describe("cursorAgent", () => {
         });
     });
 
+    describe("findClosestModel", () => {
+        it("finds exact match (case-insensitive)", () => {
+            expect(findClosestModel("opus-4.5")).toBe("opus-4.5");
+            expect(findClosestModel("OPUS-4.5")).toBe("opus-4.5");
+            expect(findClosestModel("Opus-4.5")).toBe("opus-4.5");
+        });
+
+        it("finds match with missing hyphen", () => {
+            expect(findClosestModel("opus4.5")).toBe("opus-4.5");
+            expect(findClosestModel("sonnet4.5")).toBe("sonnet-4.5");
+            expect(findClosestModel("gpt5.2")).toBe("gpt-5.2");
+            expect(findClosestModel("opus4.5thinking")).toBe("opus-4.5-thinking");
+        });
+
+        it("finds match with wrong separator (underscore instead of hyphen)", () => {
+            expect(findClosestModel("opus_4.5")).toBe("opus-4.5");
+            expect(findClosestModel("sonnet_4.5")).toBe("sonnet-4.5");
+            expect(findClosestModel("gpt_5.2")).toBe("gpt-5.2");
+        });
+
+        it("returns null for no close match", () => {
+            expect(findClosestModel("nonexistent-model")).toBeNull();
+            expect(findClosestModel("xyz123")).toBeNull();
+            expect(findClosestModel("completely-different")).toBeNull();
+        });
+    });
+
+    describe("validateModelRecognition", () => {
+        it("accepts valid supported models", () => {
+            expect(validateModelRecognition("auto")).toBe("auto");
+            expect(validateModelRecognition("opus-4.5")).toBe("opus-4.5");
+            expect(validateModelRecognition("opus-4.5-thinking")).toBe("opus-4.5-thinking");
+            expect(validateModelRecognition("sonnet-4.5")).toBe("sonnet-4.5");
+            expect(validateModelRecognition("sonnet-4.5-thinking")).toBe("sonnet-4.5-thinking");
+            expect(validateModelRecognition("gpt-5.2")).toBe("gpt-5.2");
+            expect(validateModelRecognition("gemini-3-pro")).toBe("gemini-3-pro");
+            expect(validateModelRecognition("gemini-3-flash")).toBe("gemini-3-flash");
+        });
+
+        it("normalizes case for valid models", () => {
+            expect(validateModelRecognition("OPUS-4.5")).toBe("opus-4.5");
+            expect(validateModelRecognition("Opus-4.5")).toBe("opus-4.5");
+            expect(validateModelRecognition("SONNET-4.5")).toBe("sonnet-4.5");
+        });
+
+        it("suggests closest match for typos with missing hyphen", () => {
+            expect(() => validateModelRecognition("opus4.5")).toThrow("Model not recognized: opus4.5. Did you mean opus-4.5?");
+            expect(() => validateModelRecognition("sonnet4.5")).toThrow("Model not recognized: sonnet4.5. Did you mean sonnet-4.5?");
+        });
+
+        it("suggests closest match for typos with wrong separator", () => {
+            expect(() => validateModelRecognition("opus_4.5")).toThrow("Model not recognized: opus_4.5. Did you mean opus-4.5?");
+        });
+
+        it("shows all available models when no close match found", () => {
+            expect(() => validateModelRecognition("nonexistent")).toThrow("Model not recognized: nonexistent. Available models:");
+            expect(() => validateModelRecognition("nonexistent")).toThrow("auto");
+            expect(() => validateModelRecognition("nonexistent")).toThrow("opus-4.5");
+        });
+
+        it("still performs security validation (prevents command injection)", () => {
+            expect(() => validateModelRecognition("test; rm -rf /")).toThrow("Invalid model name");
+            expect(() => validateModelRecognition("test && echo pwned")).toThrow("Invalid model name");
+            expect(() => validateModelRecognition('test"')).toThrow("Invalid model name");
+        });
+    });
+
     describe("buildCursorArgs", () => {
         it("returns base args with no options", () => {
             const args = buildCursorArgs({});
@@ -89,8 +162,16 @@ describe("cursorAgent", () => {
             expect(args).toEqual(["agent", "--model", "gpt-5.2", "-p", "--output-format", "text"]);
         });
 
-        it("throws on invalid model name", () => {
+        it("throws on invalid model name (security validation)", () => {
             expect(() => buildCursorArgs({ model: "bad; model" })).toThrow("Invalid model name");
+        });
+
+        it("throws on unrecognized model with suggestion", () => {
+            expect(() => buildCursorArgs({ model: "opus4.5" })).toThrow("Model not recognized: opus4.5. Did you mean opus-4.5?");
+        });
+
+        it("throws on unrecognized model with all available models listed", () => {
+            expect(() => buildCursorArgs({ model: "nonexistent" })).toThrow("Model not recognized: nonexistent. Available models:");
         });
 
         it("does not include interactive in args (handled by PTY)", () => {
