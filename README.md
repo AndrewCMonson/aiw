@@ -185,6 +185,8 @@ Flags:
 
 Run `cursor agent --list-models` for the full list of available models.
 
+**Model validation:** If you enter an incorrect model name, the CLI will suggest the closest match. For example, entering `opus4.5` (missing hyphen) will suggest `opus-4.5`.
+
 **Requirements:**
 
 - **Cursor CLI**: The `cursor` command must be available in your PATH. If you see an error when running `aiw`, install it by:

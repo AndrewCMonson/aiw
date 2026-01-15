@@ -24,7 +24,8 @@ export function checkCursorCLI(): CursorCLICheckResult {
 
     if (res.error) {
         // ENOENT means the command was not found
-        if (res.error.code === "ENOENT") {
+        // Check if error has a code property (NodeJS.ErrnoException)
+        if ("code" in res.error && res.error.code === "ENOENT") {
             return {
                 available: false,
                 error: "The 'cursor' command was not found in PATH.",
