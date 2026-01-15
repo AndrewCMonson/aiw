@@ -379,10 +379,13 @@ export async function runSetup(opts: {
         }
     }
 
-    // Always ensure .aiw/receipts/ exception is in .gitignore (required for receipt mechanism)
-    await ensureReceiptsGitignoreException({
-        repoRoot: process.cwd(),
-    });
+    // Ensure .aiw/receipts/ exception is in .gitignore (required for receipt mechanism)
+    // Only update .gitignore if not in skip mode
+    if (mode !== "skip") {
+        await ensureReceiptsGitignoreException({
+            repoRoot: process.cwd(),
+        });
+    }
 
     // Always create docs/PROJECT_CONTEXT.md if it doesn't exist
     const repoRoot = process.cwd();
