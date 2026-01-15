@@ -30,8 +30,7 @@ fi
 npm run lint || exit $?
 
 # Run context verification (pass saved stdin)
-# Temporarily disabled - uncomment to re-enable
-# echo "$INPUT" | ./scripts/pre-push-context-check.sh || exit $?
+echo "$INPUT" | ./scripts/pre-push-context-check.sh || exit $?
 
 # ---------------------------------------
 # AIW Pre-Push Review Gate (soft + visible)
@@ -124,4 +123,103 @@ create_receipt_for_head() {
     artifact_display="(not found)"
   fi
 
-  cat > "$RECEIPT
+  cat > "$RECEIPT_FILE" <<EOF
+# AIW Pre-Push Review Receipt
+
+- Head SHA: ${HEAD_SHA}
+- Branch: ${BRANCH}
+- Generated: ${timestamp}
+- Local artifact: ${artifact_display}
+- Risk: ${risk_level}
+EOF
+
+  echo "$RECEIPT_FILE"
+}
+
+# If receipt already exists, continue silently
+if has_receipt_for_head; then
+  echo "✅ AIW pre-push review receipt found for HEAD ($HEAD_SHA)."
+  exit 0
+fi
+
+# If commit explicitly declares skip, allow but warn
+if has_aiw_skip_commit; then
+  echo "⚠️  AIW pre-push review intentionally skipped via [aiw-skip]."
+  echo "    This will be visible in CI for this PR."
+  exit 0
+fi
+
+# If explicit env var bypass is set, allow but warn
+if [ -n "$AIW_SKIP" ]; then
+  echo "⚠️  AIW pre-push review bypassed via AIW_SKIP=$AIW_SKIP."
+  echo "    Prefer using [aiw-skip] in commit messages for auditability."
+  echo "    CI will flag this as missing unless [aiw-skip] is present."
+  exit 0
+fi
+
+# If aiw isn't installed, warn but don't block
+if ! command -v aiw >/dev/null 2>&1; then
+  echo "⚠️  aiw command not found. Skipping AIW pre-push review gate."
+  echo "    Install AIW to enable self-review enforcement."
+  exit 0
+fi
+
+echo ""
+echo "🧠 AIW pre-push self-review receipt is missing for current HEAD:"
+echo "    $HEAD_SHA"
+echo ""
+echo "Choose an action:"
+echo "  [y] Run self-review now (recommended)"
+echo "  [s] Skip this push by adding [aiw-skip] to commit message (amend and retry)"
+echo "  [n] Cancel push"
+printf "> "
+read -r response
+
+case "$response" in
+  [yY]|[yY][eE][sS])
+    echo ""
+    echo "Running AIW pre-push review (interactive)..."
+    aiw run pre_push_review -I
+    AIW_EXIT=$?
+
+    if [ "$AIW_EXIT" -ne 0 ]; then
+      echo ""
+      echo "⚠️  AIW review exited with code $AIW_EXIT."
+      echo "    Push is NOT blocked. You can re-run the review or intentionally skip with [aiw-skip]."
+      exit 0
+    fi
+
+    # Only create a receipt if we can detect an artifact (prevents false receipts)
+    artifact_path=$(find_most_recent_artifact)
+    if [ -z "$artifact_path" ] || [ ! -f "$artifact_path" ]; then
+      echo ""
+      echo "⚠️  No review artifact detected under .ai/context/pr_reviews."
+      echo "    Push is NOT blocked, but CI will flag missing receipt."
+      exit 0
+    fi
+
+    receipt_path=$(create_receipt_for_head)
+    if [ -f "$receipt_path" ]; then
+      echo ""
+      echo "✅ Receipt generated at $receipt_path — commit this file so CI can see it."
+      echo ""
+      exit 0
+    fi
+
+    echo ""
+    echo "⚠️  Failed to create receipt file. Push can proceed, but CI will flag missing receipt."
+    exit 0
+    ;;
+  [sS]|[sS][kK][iI][pP])
+    echo ""
+    echo "⚠️  To skip, add [aiw-skip] to your commit message:"
+    echo "    git commit --amend -m \"Your message [aiw-skip]\""
+    echo "    Then push again."
+    exit 1
+    ;;
+  *)
+    echo ""
+    echo "Push cancelled."
+    exit 1
+    ;;
+esac
