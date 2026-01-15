@@ -180,7 +180,7 @@ case "$response" in
   [yY]|[yY][eE][sS])
     echo ""
     echo "Running AIW pre-push review (interactive)..."
-    aiw run pre_push_review -I
+    aiw run pre_push_review -i
     AIW_EXIT=$?
 
     if [ "$AIW_EXIT" -ne 0 ]; then
