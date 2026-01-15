@@ -114,16 +114,16 @@ It works when:
 
 ### CLI commands (when installed)
 
-| Command              | Description                                    |
-| -------------------- | ---------------------------------------------- |
-| `aiw setup`          | Create `.ai/` structure and default prompts    |
-| `aiw list`           | List available prompts                         |
-| `aiw show <prompt>`  | Print prompt to stdout                         |
-| `aiw copy <prompt>`  | Copy prompt to clipboard                       |
-| `aiw open <prompt>`  | Open prompt in default editor                  |
-| `aiw new <name>`     | Create new prompt from template                |
-| `aiw run <prompt>`   | Run prompt via Cursor Agent CLI (experimental) |
-| `aiw context:verify` | Verify PROJECT_CONTEXT.md is updated           |
+| Command              | Description                                                      |
+| -------------------- | ---------------------------------------------------------------- |
+| `aiw setup`          | Create `.ai/` structure and default prompts                      |
+| `aiw list`           | List available prompts                                           |
+| `aiw show <prompt>`  | Print prompt to stdout                                           |
+| `aiw copy <prompt>`  | Copy prompt to clipboard                                         |
+| `aiw open <prompt>`  | Open prompt in default editor                                    |
+| `aiw new <name>`     | Create new prompt from template                                  |
+| `aiw run <prompt>`   | Run prompt via Cursor Agent CLI (interactive or non-interactive) |
+| `aiw context:verify` | Verify PROJECT_CONTEXT.md is updated                             |
 
 ---
 
@@ -143,7 +143,8 @@ It works when:
     - `src/lib/` — Shared utilities
         - `clipboard.ts` — Cross-platform clipboard support (pbcopy/clip/xclip/xsel/wl-copy)
         - `config.ts` — Load `.aiw.json` config, merge with defaults
-        - `cursorAgent.ts` — Cursor Agent CLI wrapper using `node-pty` for cross-platform PTY support
+        - `cursorAgent.ts` — Cursor Agent CLI wrapper using `node-pty` for cross-platform PTY support, with model validation
+        - `cursorCheck.ts` — Checks if Cursor CLI command is available in PATH
         - `fs.ts` — File system helpers (mkdirp, safeWriteFile, readTextFile)
         - `git.ts` — Git operations (isGitRepo, getCommitsInRange, getChangedFiles, etc.)
         - `hooks.ts` — Git hook installation/uninstallation
@@ -208,12 +209,13 @@ It works when:
 │ setup         │   │ clipboard     │   │ agentRules    │
 │ list          │   │ config        │   │ defaultPrompts│
 │ show          │   │ cursorAgent   │   │ projectContext│
-│ copy          │   │ fs            │   │ scaffolds     │
-│ open          │   │ git           │   └───────────────┘
-│ new           │   │ hooks         │
-│ run           │   │ opener        │
-│ context:verify│   │ paths         │
-└───────────────┘   │ slug          │
+│ copy          │   │ cursorCheck   │   │ scaffolds     │
+│ open          │   │ fs            │   └───────────────┘
+│ new           │   │ git           │
+│ run           │   │ hooks         │
+│ context:verify│   │ opener        │
+└───────────────┘   │ paths         │
+                    │ slug          │
                     └───────────────┘
 ```
 
@@ -313,7 +315,7 @@ npm test          # Runs vitest run
 
 ### Versioning
 
-- Semantic versioning in `package.json` (currently `0.1.4`)
+- Semantic versioning in `package.json` (currently `0.2.0`)
 - Version commits (e.g., `0.1.1`) bypass commit message validation
 
 ### Release flow
