@@ -10,7 +10,7 @@ Last Updated: 2026-01-14
 
 ## 1. Repo overview
 
-**What it is:** `@andrewmonson/aiw` — a small cross-platform CLI that manages a repo-local **prompt library** under `.ai/`. The prompts are meant to be **pasted into Cursor chat manually**; the CLI does not execute prompts itself (except via the experimental `run` command).
+**What it is:** `@andrewmonson/aiw` — a small cross-platform CLI that manages a repo-local **prompt library** under `.ai/`. Prompts can be **copied to clipboard** for manual pasting into Cursor chat, or **executed directly** via the `run` command which interacts with the Cursor CLI.
 
 **Primary use cases:**
 
@@ -143,7 +143,7 @@ It works when:
     - `src/lib/` — Shared utilities
         - `clipboard.ts` — Cross-platform clipboard support (pbcopy/clip/xclip/xsel/wl-copy)
         - `config.ts` — Load `.aiw.json` config, merge with defaults
-        - `cursorAgent.ts` — Cursor Agent CLI wrapper using `node-pty` for cross-platform PTY support, with model validation
+        - `cursorAgent.ts` — Cursor Agent CLI wrapper using `node-pty` for cross-platform PTY support; includes model validation with fuzzy matching (typo tolerance) and closest-match suggestions
         - `cursorCheck.ts` — Checks if Cursor CLI command is available in PATH
         - `fs.ts` — File system helpers (mkdirp, safeWriteFile, readTextFile)
         - `git.ts` — Git operations (isGitRepo, getCommitsInRange, getChangedFiles, etc.)
