@@ -1,0 +1,34 @@
+# Backend Rules
+
+These rules apply when working on backend code in this repository.
+
+## Scope
+
+This rule file applies to:
+- Server-side code, APIs, endpoints
+- Database schemas and migrations
+- Business logic and services
+- Authentication and authorization
+- Background jobs, queues, workers
+- Infrastructure and deployment configs
+
+## Before Starting
+
+1. Read core rules (\`.cursor/rules/00-core.mdc\`) - they always apply
+2. Read project context (\`docs/PROJECT_CONTEXT.md\`)
+3. Read local context (\`.ai/context/repo_context/REPO_CONTEXT.md\`)
+
+## Backend-Specific Context Updates
+
+Update \`docs/PROJECT_CONTEXT.md\` when backend changes affect:
+- API contracts, endpoints, schemas
+- Database schema or migration patterns
+- Authentication/authorization flows
+- Service architecture or boundaries
+- Infrastructure or deployment configuration
+- Environment variables or configuration
+
+## Notes
+
+- These rules complement (do not replace) core rules
+- When working on full-stack features, also consider frontend rules

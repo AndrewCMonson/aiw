@@ -1,0 +1,36 @@
+# Core Rules (Always Apply)
+
+These rules apply to all Cursor agent interactions in this repository.
+
+## Context Reading (Required, No Exceptions)
+
+**Before starting any task**, read context files in this exact order:
+
+1. **\`${projectContextPath}\`** - Authoritative project context (read first)
+2. **\`${repoContextPath}\`** - Local operational context (read second)
+
+**If information conflicts between these files, defer to \`${projectContextPath}\`** (it's the source of truth).
+
+## Context Updates
+
+When your changes affect any of the following, **update \`${projectContextPath}\`** in the same branch:
+
+- Build configuration, dependencies, tooling (\`package.json\`, \`tsconfig.json\`, etc.)
+- Architecture, module boundaries, folder structure
+- Development workflows, testing approaches
+- APIs, schemas, contracts, interfaces
+
+If you intentionally skip a context update, add \`[context-skip]\` to your commit message.
+
+## Stop Conditions
+
+- If \`${projectContextPath}\` doesn't exist, ask the user if it should be created
+- If you cannot read required context files, stop and report the issue
+- Never proceed without reading project context first
+
+## Working Principles
+
+- Project context = authoritative truth
+- Local context = working memory (may be stale)
+- Always prefer project context when in conflict
+- Update project context proactively for impactful changes
