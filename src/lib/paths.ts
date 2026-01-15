@@ -37,5 +37,5 @@ export function normalizePromptNameToSlug(name: string): string {
  */
 export function promptFilePath(workspaceFlag: string | undefined, slug: string): string {
     const { promptsDir } = resolveWorkspacePaths(workspaceFlag);
-    return path.join(promptsDir, `${slug}.md`);
+    return path.join(promptsDir, slug, `${slug}.md`);
 }

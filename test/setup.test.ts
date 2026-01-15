@@ -30,7 +30,7 @@ describe("aiw setup", () => {
             expect(await exists(path.join(dir, ".ai"))).toBe(true);
             expect(await exists(path.join(dir, ".ai", "README.md"))).toBe(true);
             expect(await exists(path.join(dir, ".ai", "prompts"))).toBe(true);
-            expect(await exists(path.join(dir, ".ai", "prompts", "repo_discover.md"))).toBe(true);
+            expect(await exists(path.join(dir, ".ai", "prompts", "repo_discover", "repo_discover.md"))).toBe(true);
             expect(await exists(path.join(dir, ".ai", "context"))).toBe(true);
             expect(await exists(path.join(dir, ".ai", "context", "repo_context"))).toBe(true);
             expect(await exists(path.join(dir, ".ai", "context", "repo_context", "REPO_CONTEXT.md"))).toBe(true);
@@ -101,7 +101,7 @@ describe("aiw setup", () => {
             process.chdir(dir);
             await runSetup({ workspace: ".ai", force: false, gitignoreMode: "skip" });
 
-            const promptPath = path.join(dir, ".ai", "prompts", "repo_discover.md");
+            const promptPath = path.join(dir, ".ai", "prompts", "repo_discover", "repo_discover.md");
             await fs.writeFile(promptPath, "SENTINEL\n", "utf8");
 
             await runSetup({ workspace: ".ai", force: false, gitignoreMode: "skip" });

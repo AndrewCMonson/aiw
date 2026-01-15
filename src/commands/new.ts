@@ -31,9 +31,10 @@ export async function createNewPrompt(opts: { name: string; options: NewOptions 
     if (!slug) throw new Error("Invalid prompt name (slug resolved to empty).");
 
     const { workspaceDir, promptsDir } = resolveWorkspacePaths(opts.options.workspace);
-    await mkdirp(promptsDir);
+    const promptDir = path.join(promptsDir, slug);
+    await mkdirp(promptDir);
 
-    const filePath = path.join(promptsDir, `${slug}.md`);
+    const filePath = path.join(promptDir, `${slug}.md`);
     const title = opts.options.title?.trim() || titleCaseFromSlug(slug);
 
     const md = scaffoldPromptMarkdown({

@@ -1,0 +1,82 @@
+name: AIW Self-Review Check (Pilot)
+
+on:
+  pull_request:
+
+jobs:
+  aiw-self-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify AIW self-review artifact exists for PR HEAD
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REVIEWS_DIR=".ai/context/pr_reviews"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          echo "PR HEAD SHA: $HEAD_SHA"
+
+          RANGE="origin/${{ github.base_ref }}..HEAD"
+
+          # Pilot escape hatch (explicit intent)
+          if git log --format=%B "$RANGE" | grep -q "\[aiw-skip\]"; then
+            {
+              echo "## ⚠️ AIW Self-Review Skipped via \`[aiw-skip]\` (Pilot)"
+              echo ""
+              echo "- PR HEAD: \`$HEAD_SHA\`"
+              echo "- This is allowed during the pilot. Consider removing skip once stable."
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            echo "::warning title=AIW Self-Review Skipped::PR includes [aiw-skip]. Self-review was intentionally skipped (pilot mode)."
+            exit 0
+          fi
+
+          if [ ! -d "$REVIEWS_DIR" ]; then
+            {
+              echo "## ⚠️ AIW Self-Review Missing (Pilot)"
+              echo ""
+              echo "- Missing directory: \`$REVIEWS_DIR\`"
+              echo "- Expected an artifact referencing PR HEAD: \`$HEAD_SHA\`"
+              echo ""
+              echo "**How to comply**"
+              echo "1) Run locally: \`aiw run pre_push_review -I\`"
+              echo "2) Confirm the plan, let it write the artifact"
+              echo "3) Push again"
+              echo ""
+              echo "**Intentional skip (pilot)**"
+              echo "- Add \`[aiw-skip]\` to a commit message in this PR range"
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            echo "::warning title=AIW Self-Review Missing::No .ai/context/pr_reviews directory. Run: aiw run pre_push_review -I and push again."
+            exit 0
+          fi
+
+          if grep -R --quiet "$HEAD_SHA" "$REVIEWS_DIR"/*.md 2>/dev/null; then
+            {
+              echo "## ✅ AIW Self-Review Present (Pilot)"
+              echo ""
+              echo "- Found an artifact referencing PR HEAD: \`$HEAD_SHA\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          {
+            echo "## ⚠️ AIW Self-Review Missing (Pilot)"
+            echo ""
+            echo "- No artifact in \`$REVIEWS_DIR\` references PR HEAD: \`$HEAD_SHA\`"
+            echo ""
+            echo "**How to comply**"
+            echo "1) Run locally: \`aiw run pre_push_review -I\`"
+            echo "2) Confirm the plan, let it write the artifact"
+            echo "3) Push again"
+            echo ""
+            echo "**Intentional skip (pilot)**"
+            echo "- Add \`[aiw-skip]\` to a commit message in this PR range"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "::warning title=AIW Self-Review Missing::No AIW self-review artifact references PR HEAD ($HEAD_SHA). Run: aiw run pre_push_review -I"
+          exit 0

@@ -44,6 +44,15 @@ export interface RunCursorAgentResult {
     exitCode: number;
 }
 
+export interface CursorAgentHandle {
+    /** Promise that resolves when the process exits */
+    result: Promise<RunCursorAgentResult>;
+    /** Gracefully terminate the process */
+    kill: () => Promise<void>;
+    /** Process ID */
+    pid: number;
+}
+
 /**
  * Calculates a simple similarity score between two strings.
  * Returns a value between 0 and 1, where 1 is identical.
@@ -285,7 +294,93 @@ function suppressPtyWriteErrors(): () => void {
 }
 
 /**
- * Runs the Cursor Agent CLI with the given prompt.
+ * Checks if a process is still running.
+ *
+ * @param pid - Process ID to check
+ * @returns True if process is still running
+ */
+function isProcessRunning(pid: number): boolean {
+    try {
+        // Signal 0 doesn't actually send a signal, just checks if process exists
+        process.kill(pid, 0);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Gracefully terminates a process with escalating signals.
+ * Sequence: SIGINT -> SIGINT (after 500ms) -> SIGTERM (after 500ms) -> SIGKILL (after 2000ms).
+ *
+ * @param pid - Process ID (use negative for process group on Unix/macOS)
+ * @param isWindows - Whether running on Windows
+ * @returns Promise that resolves when termination is complete
+ */
+async function gracefulKill(pid: number, isWindows: boolean): Promise<void> {
+    if (isWindows) {
+        // On Windows, try taskkill first, then fall back to kill
+        try {
+            const { execSync } = await import("node:child_process");
+            // Try to kill the process tree (use absolute PID)
+            execSync(`taskkill /T /PID ${Math.abs(pid)}`, { stdio: "ignore" });
+            // Wait a bit to see if it worked
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            if (!isProcessRunning(Math.abs(pid))) {
+                return;
+            }
+        } catch {
+            // taskkill failed, continue with regular kill
+        }
+    }
+
+    // First SIGINT
+    try {
+        process.kill(pid, "SIGINT");
+    } catch {
+        // Process may have already exited
+        return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    if (!isProcessRunning(Math.abs(pid))) {
+        return;
+    }
+
+    // Second SIGINT
+    try {
+        process.kill(pid, "SIGINT");
+    } catch {
+        return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    if (!isProcessRunning(Math.abs(pid))) {
+        return;
+    }
+
+    // SIGTERM
+    try {
+        process.kill(pid, "SIGTERM");
+    } catch {
+        return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    if (!isProcessRunning(Math.abs(pid))) {
+        return;
+    }
+
+    // Last resort: SIGKILL
+    try {
+        process.kill(pid, "SIGKILL");
+    } catch {
+        // Ignore errors at this point
+    }
+}
+
+/**
+ * Spawns the Cursor Agent CLI and returns a handle for control.
  *
  * Uses node-pty for cross-platform pseudo-terminal support (Windows, macOS, Linux).
  * In print mode (-p), the prompt is passed as a command-line argument.
@@ -293,70 +388,72 @@ function suppressPtyWriteErrors(): () => void {
  *
  * @param prompt - The prompt to send to the agent
  * @param options - Optional configuration for print mode and output format
- * @returns Promise resolving with stdout, stderr, and exit code
+ * @returns Handle with result promise, kill method, and process ID
  * @throws Error if the cursor command cannot be spawned
  */
-export function runCursorAgent(prompt: string, options: RunCursorAgentOptions = {}): Promise<RunCursorAgentResult> {
+export function spawnCursorAgent(prompt: string, options: RunCursorAgentOptions = {}): CursorAgentHandle {
     // Suppress expected PTY write errors during execution
     const restoreConsoleError = suppressPtyWriteErrors();
 
-    return new Promise((resolve, reject) => {
-        // In non-interactive (print) mode, pass prompt as command-line argument
-        // In interactive mode, we'll send it via stdin after a delay
-        const cursorCmd = options.interactive ? buildCursorCommand(options) : buildCursorCommand(options, prompt);
-        const { shell, shellArgs } = getShellConfig();
-        const delay = (options.promptDelay ?? 1) * 1000;
+    // In non-interactive (print) mode, pass prompt as command-line argument
+    // In interactive mode, we'll send it via stdin after a delay
+    const cursorCmd = options.interactive ? buildCursorCommand(options) : buildCursorCommand(options, prompt);
+    const { shell, shellArgs } = getShellConfig();
+    const delay = (options.promptDelay ?? 1) * 1000;
+    const isWindows = process.platform === "win32";
 
-        let stdout = "";
-        // node-pty combines stdout/stderr into a single stream
-        const stderr = "";
+    let stdout = "";
+    // node-pty combines stdout/stderr into a single stream
+    const stderr = "";
 
-        let ptyProcess: pty.IPty;
-        let hasExited = false;
+    let ptyProcess: pty.IPty | null = null;
+    let hasExited = false;
+    let killInProgress = false;
 
-        // Helper function to safely write to PTY
-        const safeWrite = (data: string): void => {
-            if (hasExited) {
-                return;
-            }
-            try {
-                ptyProcess.write(data);
-            } catch (err) {
-                const error = err as NodeJS.ErrnoException;
-                // Ignore expected errors (process already closed/exited)
-                if (!PTY_EXPECTED_ERROR_CODES.has(error.code || "")) {
-                    // Only log unexpected errors
-                    console.error(`PTY write error: ${error.message}`);
-                }
-            }
-        };
-
-        try {
-            // Spawn through shell to properly resolve PATH and handle symlinks/scripts
-            ptyProcess = pty.spawn(shell, shellArgs(cursorCmd), {
-                name: "xterm-256color",
-                cols: 120,
-                rows: 30,
-                cwd: process.cwd(),
-                env: process.env as Record<string, string>,
-            });
-        } catch (err) {
-            restoreConsoleError();
-            const error = err as NodeJS.ErrnoException;
-            if (error.code === "ENOENT" || error.message?.includes("ENOENT")) {
-                reject(
-                    new Error(
-                        "The 'cursor' command was not found in PATH. " +
-                            "Make sure Cursor is installed and the CLI is available. " +
-                            "You may need to run 'Install cursor command' from the Cursor command palette.",
-                    ),
-                );
-            } else {
-                reject(new Error(`Failed to spawn cursor agent: ${error.message}`));
-            }
+    // Helper function to safely write to PTY
+    const safeWrite = (data: string): void => {
+        if (hasExited || !ptyProcess) {
             return;
         }
+        try {
+            ptyProcess.write(data);
+        } catch (err) {
+            const error = err as NodeJS.ErrnoException;
+            // Ignore expected errors (process already closed/exited)
+            if (!PTY_EXPECTED_ERROR_CODES.has(error.code || "")) {
+                // Only log unexpected errors
+                console.error(`PTY write error: ${error.message}`);
+            }
+        }
+    };
 
+    // Spawn the process synchronously (pty.spawn is synchronous)
+    try {
+        // Spawn through shell to properly resolve PATH and handle symlinks/scripts
+        // On Unix/macOS, node-pty creates a new session (process group) by default
+        ptyProcess = pty.spawn(shell, shellArgs(cursorCmd), {
+            name: "xterm-256color",
+            cols: 120,
+            rows: 30,
+            cwd: process.cwd(),
+            env: process.env as Record<string, string>,
+        });
+    } catch (err) {
+        restoreConsoleError();
+        const error = err as NodeJS.ErrnoException;
+        if (error.code === "ENOENT" || error.message?.includes("ENOENT")) {
+            throw new Error(
+                "The 'cursor' command was not found in PATH. " +
+                    "Make sure Cursor is installed and the CLI is available. " +
+                    "You may need to run 'Install cursor command' from the Cursor command palette.",
+            );
+        } else {
+            throw new Error(`Failed to spawn cursor agent: ${error.message}`);
+        }
+    }
+
+    // Now ptyProcess is guaranteed to be assigned
+    const resultPromise = new Promise<RunCursorAgentResult>((resolve) => {
         // Capture output
         ptyProcess.onData((data: string) => {
             stdout += data;
@@ -404,8 +501,47 @@ export function runCursorAgent(prompt: string, options: RunCursorAgentOptions = 
 
             // Handle Ctrl+C to gracefully exit
             process.on("SIGINT", () => {
-                ptyProcess.kill();
+                if (!killInProgress && ptyProcess) {
+                    ptyProcess.kill();
+                }
             });
         }
     });
+
+    const kill = async (): Promise<void> => {
+        if (hasExited || killInProgress || !ptyProcess) {
+            return;
+        }
+        killInProgress = true;
+
+        // On Unix/macOS, use negative PID to signal the process group
+        // On Windows, use positive PID
+        const signalPid = isWindows ? ptyProcess.pid : -ptyProcess.pid;
+
+        await gracefulKill(signalPid, isWindows);
+    };
+
+    // ptyProcess is guaranteed to be assigned at this point (spawn is synchronous)
+    return {
+        result: resultPromise,
+        kill,
+        pid: ptyProcess.pid,
+    };
+}
+
+/**
+ * Runs the Cursor Agent CLI with the given prompt.
+ *
+ * Uses node-pty for cross-platform pseudo-terminal support (Windows, macOS, Linux).
+ * In print mode (-p), the prompt is passed as a command-line argument.
+ * In interactive mode (-i), the user can review and submit the prompt manually.
+ *
+ * @param prompt - The prompt to send to the agent
+ * @param options - Optional configuration for print mode and output format
+ * @returns Promise resolving with stdout, stderr, and exit code
+ * @throws Error if the cursor command cannot be spawned
+ */
+export function runCursorAgent(prompt: string, options: RunCursorAgentOptions = {}): Promise<RunCursorAgentResult> {
+    const handle = spawnCursorAgent(prompt, options);
+    return handle.result;
 }

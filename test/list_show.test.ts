@@ -39,7 +39,7 @@ describe("aiw list/show", () => {
                 promptName: "repo_discover",
             });
 
-            const filePath = path.join(dir, ".ai", "prompts", "repo_discover.md");
+            const filePath = path.join(dir, ".ai", "prompts", "repo_discover", "repo_discover.md");
             const fileContents = await fs.readFile(filePath, "utf8");
             expect(contents).toBe(fileContents);
         } finally {

@@ -4,6 +4,7 @@
  */
 
 import { Command } from "commander";
+import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 
 import { resolveWorkspacePaths } from "../lib/paths.js";
@@ -16,17 +17,27 @@ import { resolveWorkspacePaths } from "../lib/paths.js";
 export async function listPrompts(opts: { workspace?: string }): Promise<string[]> {
     const { promptsDir } = resolveWorkspacePaths(opts.workspace);
 
-    let entries: string[];
+    let entries: Dirent[];
     try {
-        entries = await fs.readdir(promptsDir);
+        entries = await fs.readdir(promptsDir, { withFileTypes: true });
     } catch {
         return [];
     }
 
-    return entries
-        .filter((f) => f.toLowerCase().endsWith(".md"))
-        .map((f) => f.replace(/\.md$/i, ""))
-        .sort((a, b) => a.localeCompare(b));
+    const slugs: string[] = [];
+    for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        // Check if directory contains a matching .md file (e.g., pre_push_review/pre_push_review.md)
+        const promptFile = `${entry.name}.md`;
+        try {
+            await fs.access(`${promptsDir}/${entry.name}/${promptFile}`);
+            slugs.push(entry.name);
+        } catch {
+            // No matching prompt file in this directory
+        }
+    }
+
+    return slugs.sort((a, b) => a.localeCompare(b));
 }
 
 /**

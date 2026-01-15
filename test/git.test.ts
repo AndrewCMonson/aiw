@@ -14,6 +14,7 @@ import {
     getChangedFilesPerCommit,
     getCommitsInRange,
     getCurrentBranch,
+    getHeadSha,
     hasFileInRange,
     isGitRepo,
 } from "../src/lib/git.js";
@@ -44,6 +45,30 @@ describe("git utilities", () => {
 
         const branch = getCurrentBranch(dir);
         expect(branch).toBe("main");
+    });
+
+    it("gets HEAD SHA", async () => {
+        const dir = await makeTempDir();
+        await initGitRepo(dir);
+
+        // Create initial commit
+        await fs.writeFile(path.join(dir, "test.txt"), "test", "utf8");
+        execSync("git add test.txt", { cwd: dir });
+        execSync("git commit -m 'Initial commit'", { cwd: dir });
+
+        const headSha = getHeadSha(dir);
+        expect(headSha).toBeTruthy();
+        expect(headSha?.length).toBe(40); // Full SHA is 40 characters
+
+        // Verify it matches git rev-parse HEAD
+        const expectedSha = execSync("git rev-parse HEAD", { cwd: dir, encoding: "utf8" }).trim();
+        expect(headSha).toBe(expectedSha);
+    });
+
+    it("returns null for HEAD SHA when not in git repo", () => {
+        const dir = "/nonexistent/directory";
+        const headSha = getHeadSha(dir);
+        expect(headSha).toBeNull();
     });
 
     it("gets commits in range with skip token detection", async () => {

@@ -222,3 +222,21 @@ export function getCurrentBranch(repoRoot?: string): string {
         return "";
     }
 }
+
+/**
+ * Get the current HEAD commit SHA (full hash).
+ *
+ * @param repoRoot - Root directory of the repository (defaults to process.cwd())
+ * @returns Full commit SHA or null if not in a git repo or command fails
+ */
+export function getHeadSha(repoRoot?: string): string | null {
+    if (!isGitRepo(repoRoot)) {
+        return null;
+    }
+
+    try {
+        return execGit(["rev-parse", "HEAD"], repoRoot).trim();
+    } catch {
+        return null;
+    }
+}

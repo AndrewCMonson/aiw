@@ -59,7 +59,9 @@ export async function safeWriteFile(filePath: string, contents: string, opts: { 
         return { action: "skipped", path: filePath };
     }
 
-    const backupPath = `${filePath}.bak.${timestampForBackup()}`;
+    const backupDir = path.join(path.dirname(filePath), "backups");
+    await mkdirp(backupDir);
+    const backupPath = path.join(backupDir, `${path.basename(filePath)}.bak.${timestampForBackup()}`);
     await fs.copyFile(filePath, backupPath);
     await fs.writeFile(filePath, contents, "utf8");
     return { action: "overwritten", path: filePath, backupPath };

@@ -5,30 +5,100 @@ INPUT=$(cat)
 
 # Skip validation for merge commits
 if git log -1 --pretty=%B | grep -q "^Merge"; then
-    exit 0
+  exit 0
 fi
 
 # Get current branch name
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 # Allow protected branches (main, master, develop) to bypass branch name validation
+IS_PROTECTED=0
 if echo "$BRANCH" | grep -qE "^(main|master|develop)$"; then
-    # Run full linting before push
-    npm run lint
-    # Run context verification (pass saved stdin)
-    echo "$INPUT" | ./scripts/pre-push-context-check.sh
-    exit $?
+  IS_PROTECTED=1
 fi
 
-# Validate branch naming convention: feature/ABC-123 or feature/ABC-123-Description
-if ! echo "$BRANCH" | grep -qE "^feature/[A-Z]+-[0-9]+(-[a-zA-Z0-9-]+)?$"; then
+# Validate branch naming convention for non-protected branches
+if [ "$IS_PROTECTED" -eq 0 ]; then
+  if ! echo "$BRANCH" | grep -qE "^feature/[A-Z]+-[0-9]+(-[a-zA-Z0-9-]+)?$"; then
     echo "Error: Branch name must follow pattern: feature/ABC-123 or feature/ABC-123-Description"
     echo "Current branch: $BRANCH"
     exit 1
+  fi
 fi
 
 # Run full linting before push
-npm run lint
+npm run lint || exit $?
 
-# Run context verification for feature branches too
-echo "$INPUT" | ./scripts/pre-push-context-check.sh
+# Run context verification (pass saved stdin)
+echo "$INPUT" | ./scripts/pre-push-context-check.sh || exit $?
+
+# ---------------------------------------
+# AIW Pre-Push Review Gate (soft + visible)
+# ---------------------------------------
+
+# ---------------------------------------
+# AIW Pre-Push Review Gate (soft + visible)
+# ---------------------------------------
+
+# Determine current HEAD SHA (used to verify freshness)
+HEAD_SHA=$(git rev-parse HEAD 2>/dev/null)
+if [ -z "$HEAD_SHA" ]; then
+  echo "⚠️  Unable to determine HEAD SHA. Skipping AIW pre-push review gate."
+  exit 0
+fi
+
+REVIEWS_DIR=".ai/context/pr_reviews"
+
+# Helper: does a review exist for this HEAD?
+has_review_for_head() {
+  if [ ! -d "$REVIEWS_DIR" ]; then
+    return 1
+  fi
+
+  if grep -R --quiet "$HEAD_SHA" "$REVIEWS_DIR"/*.md 2>/dev/null; then
+    return 0
+  fi
+
+  return 1
+}
+
+# Helper: detect intentional skip via commit message
+has_aiw_skip_commit() {
+  git log -1 --pretty=%B | grep -q "\[aiw-skip\]"
+}
+
+# If review already exists, continue silently
+if has_review_for_head; then
+  echo "✅ AIW pre-push review found for HEAD ($HEAD_SHA)."
+  exit 0
+fi
+
+# If commit explicitly declares skip, allow but warn
+if has_aiw_skip_commit; then
+  echo "⚠️  AIW pre-push review intentionally skipped via [aiw-skip]."
+  echo "    This will be visible in CI for this PR."
+  exit 0
+fi
+
+# If explicit env var bypass is set, allow but warn (stronger wording)
+if [ -n "$AIW_SKIP" ]; then
+  echo "⚠️  AIW pre-push review bypassed via AIW_SKIP=$AIW_SKIP."
+  echo "    Prefer using [aiw-skip] in commit messages for auditability."
+  echo "    CI will flag this as missing unless [aiw-skip] is present."
+  exit 0
+fi
+
+# If aiw isn't installed, warn but don't block
+if ! command -v aiw >/dev/null 2>&1; then
+  echo "⚠️  aiw command not found. Skipping AIW pre-push review gate."
+  echo "    Install AIW to enable self-review enforcement."
+  exit 0
+fi
+
+echo ""
+echo "🧠 AIW pre-push self-review is missing for current HEAD:"
+echo "    $HEAD_SHA"
+echo ""
+echo "Choose an action:"
+echo "  [y] Run self-review now (recommended)"
+echo "  [s] Skip this push by
