@@ -166,61 +166,18 @@ if ! command -v aiw >/dev/null 2>&1; then
 fi
 
 echo ""
-echo "🧠 AIW pre-push self-review receipt is missing for current HEAD:"
+echo "❌ AIW pre-push self-review receipt is missing for current HEAD:"
 echo "    $HEAD_SHA"
 echo ""
-echo "Choose an action:"
-echo "  [y] Run self-review now (recommended)"
-echo "  [s] Skip this push by adding [aiw-skip] to commit message (amend and retry)"
-echo "  [n] Cancel push"
-printf "> "
-read -r response < /dev/tty
-
-case "$response" in
-  [yY]|[yY][eE][sS])
-    echo ""
-    echo "Running AIW pre-push review (interactive)..."
-    aiw run pre_push_review -i
-    AIW_EXIT=$?
-
-    if [ "$AIW_EXIT" -ne 0 ]; then
-      echo ""
-      echo "⚠️  AIW review exited with code $AIW_EXIT."
-      echo "    Push is NOT blocked. You can re-run the review or intentionally skip with [aiw-skip]."
-      exit 0
-    fi
-
-    # Only create a receipt if we can detect an artifact (prevents false receipts)
-    artifact_path=$(find_most_recent_artifact)
-    if [ -z "$artifact_path" ] || [ ! -f "$artifact_path" ]; then
-      echo ""
-      echo "⚠️  No review artifact detected under .ai/context/pr_reviews."
-      echo "    Push is NOT blocked, but CI will flag missing receipt."
-      exit 0
-    fi
-
-    receipt_path=$(create_receipt_for_head)
-    if [ -f "$receipt_path" ]; then
-      echo ""
-      echo "✅ Receipt generated at $receipt_path — commit this file so CI can see it."
-      echo ""
-      exit 0
-    fi
-
-    echo ""
-    echo "⚠️  Failed to create receipt file. Push can proceed, but CI will flag missing receipt."
-    exit 0
-    ;;
-  [sS]|[sS][kK][iI][pP])
-    echo ""
-    echo "⚠️  To skip, add [aiw-skip] to your commit message:"
-    echo "    git commit --amend -m \"Your message [aiw-skip]\""
-    echo "    Then push again."
-    exit 1
-    ;;
-  *)
-    echo ""
-    echo "Push cancelled."
-    exit 1
-    ;;
-esac
+echo "To comply, run the review and commit the receipt:"
+echo ""
+echo "    aiw run pre_push_review -i"
+echo "    git add .aiw/receipts/"
+echo "    git commit --amend --no-edit"
+echo "    git push"
+echo ""
+echo "To intentionally skip (visible in CI):"
+echo "    git commit --amend -m \"Your message [aiw-skip]\""
+echo "    git push"
+echo ""
+exit 1
