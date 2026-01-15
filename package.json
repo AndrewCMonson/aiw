@@ -1,6 +1,6 @@
 {
     "name": "@andrewmonson/aiw",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "description": "Repo-local prompt library CLI for Cursor workflows",
     "license": "MIT",
     "type": "module",
