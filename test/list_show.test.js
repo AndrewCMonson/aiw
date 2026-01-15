@@ -13,15 +13,8 @@ describe("aiw list/show", () => {
             process.chdir(dir);
             await runSetup({ workspace: ".ai", force: false, gitignoreMode: "skip" });
             const slugs = await listPrompts({ workspace: ".ai" });
-            expect(slugs).toEqual([
-                "debug_senior",
-                "feature_plan",
-                "pre_push_review",
-                "repo_discover",
-                "repo_refresh"
-            ]);
-        }
-        finally {
+            expect(slugs).toEqual(["context_sync", "debug_senior", "feature_plan", "pre_push_review", "repo_discover", "repo_refresh"]);
+        } finally {
             process.chdir(cwd);
         }
     });
@@ -33,13 +26,12 @@ describe("aiw list/show", () => {
             await runSetup({ workspace: ".ai", force: false, gitignoreMode: "skip" });
             const { contents } = await getPromptContents({
                 workspace: ".ai",
-                promptName: "repo_discover"
+                promptName: "repo_discover",
             });
             const filePath = path.join(dir, ".ai", "prompts", "repo_discover.md");
             const fileContents = await fs.readFile(filePath, "utf8");
             expect(contents).toBe(fileContents);
-        }
-        finally {
+        } finally {
             process.chdir(cwd);
         }
     });
