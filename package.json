@@ -26,7 +26,8 @@
         "lint": "eslint --ext .ts,.tsx src/",
         "lint:fix": "eslint --ext .ts,.tsx src/ --fix",
         "prepare": "husky",
-        "prepublishOnly": "npm run build && npm test"
+        "prepublishOnly": "npm run build && npm test",
+        "aiw:review": "aiw run pre_push_review -i"
     },
     "keywords": [
         "cli",

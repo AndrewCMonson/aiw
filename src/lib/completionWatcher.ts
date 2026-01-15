@@ -10,8 +10,8 @@ import path from "node:path";
 export interface PromptArtifactConfig {
     /** Watch paths: directories for new files, or specific file paths for modifications */
     watchPaths: string[];
-    /** Detection mode: 'new-files' watches for new files, 'modify-existing' watches specific files, 'both' does both */
-    detectionMode: "new-files" | "modify-existing" | "both";
+    /** Detection mode: 'new-files' watches for new files, 'modify-existing' watches specific files, 'both' does both, 'all-files' requires all paths to match */
+    detectionMode: "new-files" | "modify-existing" | "both" | "all-files";
 }
 
 /**
@@ -71,21 +71,40 @@ export interface CompletionWatcher extends EventEmitter {
  *
  * @param promptSlug - Prompt slug to look up
  * @param workspace - Workspace directory (default: ".ai")
+ * @param headSha - Optional HEAD SHA for constructing receipt paths
  * @returns Artifact configuration for the prompt
  */
-function getPromptArtifactConfig(promptSlug: string | undefined, workspace: string): PromptArtifactConfig {
+function getPromptArtifactConfig(promptSlug: string | undefined, workspace: string, headSha?: string): PromptArtifactConfig {
     // Resolve workspace path - handle both relative and absolute paths
     const workspacePath = path.isAbsolute(workspace) ? workspace : path.resolve(process.cwd(), workspace);
 
     if (promptSlug && PROMPT_ARTIFACT_MAP[promptSlug]) {
         const config = PROMPT_ARTIFACT_MAP[promptSlug];
+        let watchPaths = config.watchPaths;
+        let detectionMode = config.detectionMode;
+
+        // Special handling for pre_push_review: add receipt path if headSha is provided
+        if (promptSlug === "pre_push_review" && headSha) {
+            watchPaths = [...watchPaths, `.aiw/receipts/pre_push_review/${headSha}.md`];
+            detectionMode = "all-files";
+        }
+
         // Resolve paths relative to workspace or process.cwd()
         return {
-            watchPaths: config.watchPaths.map((p) => {
+            watchPaths: watchPaths.map((p) => {
                 if (p.startsWith(".ai/")) {
                     // Remove ".ai/" prefix and join with workspace path
                     const relativePath = p.slice(4); // "context/repo_context/REPO_CONTEXT.md"
                     const resolvedPath = path.join(workspacePath, relativePath);
+                    if (process.env.DEBUG) {
+                        process.stderr.write(`[DEBUG] Resolved path: ${p} -> ${resolvedPath}\n`);
+                    }
+                    return resolvedPath;
+                }
+                if (p.startsWith(".aiw/")) {
+                    // Remove ".aiw/" prefix and resolve relative to process.cwd()
+                    const relativePath = p.slice(5); // "receipts/pre_push_review/${headSha}.md"
+                    const resolvedPath = path.resolve(process.cwd(), ".aiw", relativePath);
                     if (process.env.DEBUG) {
                         process.stderr.write(`[DEBUG] Resolved path: ${p} -> ${resolvedPath}\n`);
                     }
@@ -98,7 +117,7 @@ function getPromptArtifactConfig(promptSlug: string | undefined, workspace: stri
                 }
                 return resolvedPath;
             }),
-            detectionMode: config.detectionMode,
+            detectionMode,
         };
     }
 
@@ -138,7 +157,7 @@ export function startCompletionWatcher(options: CompletionWatcherOptions): Compl
               watchPaths: [reviewsDir],
               detectionMode: "new-files" as const,
           }
-        : getPromptArtifactConfig(promptSlug, workspace);
+        : getPromptArtifactConfig(promptSlug, workspace, headSha);
 
     if (process.env.DEBUG) {
         process.stderr.write(`[DEBUG] Completion watcher started:\n`);
@@ -229,10 +248,31 @@ export function startCompletionWatcher(options: CompletionWatcherOptions): Compl
 
     /**
      * Checks a specific file path (for modify-existing mode).
+     * For receipt files, skip HEAD SHA check (they don't include the pattern).
      * @param filePath
      */
     const checkSpecificFile = async (filePath: string): Promise<string | null> => {
         try {
+            // For receipt files, don't check HEAD SHA in contents (they use different format)
+            const isReceiptFile = filePath.includes("receipts");
+            if (isReceiptFile) {
+                // Just check mtime, skip SHA verification
+                const stats = await fs.stat(filePath);
+                const fileMtime = stats.mtimeMs;
+                const timingBuffer = 50;
+                const adjustedStartTime = sessionStartTime - timingBuffer;
+
+                if (fileMtime > adjustedStartTime) {
+                    if (process.env.DEBUG) {
+                        process.stderr.write(
+                            `[DEBUG] Receipt file ${filePath} mtime ${fileMtime} > sessionStart ${sessionStartTime} (adjusted: ${adjustedStartTime}) - MATCH\n`,
+                        );
+                    }
+                    return filePath;
+                }
+                return null;
+            }
+            // For other files, use full checkFile logic (includes SHA verification)
             return await checkFile(filePath);
         } catch {
             return null;
@@ -278,6 +318,9 @@ export function startCompletionWatcher(options: CompletionWatcherOptions): Compl
         return null;
     };
 
+    // Track matched file paths for "all-files" mode (maps watch path index to matched file path)
+    const matchedFiles = new Map<number, string>();
+
     /**
      * Polls watch paths for matching artifacts.
      */
@@ -287,49 +330,124 @@ export function startCompletionWatcher(options: CompletionWatcherOptions): Compl
         }
 
         try {
-            for (const watchPath of artifactConfig.watchPaths) {
-                if (isStopped) {
-                    return;
-                }
+            // For "all-files" mode, check all paths and track matches
+            if (artifactConfig.detectionMode === "all-files") {
+                for (let i = 0; i < artifactConfig.watchPaths.length; i++) {
+                    const watchPath = artifactConfig.watchPaths[i];
+                    if (isStopped) {
+                        return;
+                    }
 
-                let match: string | null = null;
+                    // Skip if already matched
+                    if (matchedFiles.has(i)) {
+                        continue;
+                    }
 
-                // Check if watchPath is a file or directory
-                try {
-                    const stats = await fs.stat(watchPath);
-                    if (stats.isFile()) {
-                        // Specific file to watch (modify-existing mode)
-                        if (artifactConfig.detectionMode === "modify-existing" || artifactConfig.detectionMode === "both") {
+                    let match: string | null = null;
+
+                    // Check if watchPath is a file or directory
+                    try {
+                        const stats = await fs.stat(watchPath);
+                        if (stats.isFile()) {
+                            // Specific file to watch (receipt file)
                             if (process.env.DEBUG) {
                                 process.stderr.write(`[DEBUG] Polling file: ${watchPath}\n`);
                             }
                             match = await checkSpecificFile(watchPath);
-                        }
-                    } else if (stats.isDirectory()) {
-                        // Directory to watch (new-files mode)
-                        if (artifactConfig.detectionMode === "new-files" || artifactConfig.detectionMode === "both") {
+                        } else if (stats.isDirectory()) {
+                            // Directory to watch (review files)
                             if (process.env.DEBUG) {
                                 process.stderr.write(`[DEBUG] Polling directory: ${watchPath}\n`);
                             }
                             match = await checkDirectory(watchPath);
                         }
+                    } catch (err) {
+                        // Path doesn't exist yet, continue to next path
+                        if (process.env.DEBUG) {
+                            const error = err as NodeJS.ErrnoException;
+                            process.stderr.write(`[DEBUG] Path ${watchPath} not accessible: ${error.message}\n`);
+                        }
+                        continue;
                     }
-                } catch (err) {
-                    // Path doesn't exist yet, continue to next path
-                    if (process.env.DEBUG) {
-                        const error = err as NodeJS.ErrnoException;
-                        process.stderr.write(`[DEBUG] Path ${watchPath} not accessible: ${error.message}\n`);
+
+                    if (match) {
+                        if (process.env.DEBUG) {
+                            process.stderr.write(`[DEBUG] Match found for path ${watchPath} (index ${i}): ${match}\n`);
+                        }
+                        matchedFiles.set(i, match);
                     }
-                    continue;
                 }
 
-                if (match) {
+                if (process.env.DEBUG) {
+                    process.stderr.write(`[DEBUG] Matched files: ${matchedFiles.size}/${artifactConfig.watchPaths.length}\n`);
+                }
+
+                // Check if all paths have matched
+                if (matchedFiles.size === artifactConfig.watchPaths.length) {
                     if (process.env.DEBUG) {
-                        process.stderr.write(`[DEBUG] Match found: ${match}\n`);
+                        process.stderr.write(`[DEBUG] All paths matched! Emitting complete.\n`);
                     }
                     stop();
-                    emitter.emit("complete", { artifactPath: match });
+                    // Find the review file (not the receipt) to use as artifact path
+                    let reviewFilePath: string | null = null;
+                    for (let i = 0; i < artifactConfig.watchPaths.length; i++) {
+                        const watchPath = artifactConfig.watchPaths[i];
+                        const matchedFile = matchedFiles.get(i);
+                        if (matchedFile && watchPath.includes("pr_reviews") && !watchPath.includes("receipts")) {
+                            reviewFilePath = matchedFile;
+                            break;
+                        }
+                    }
+                    // Fallback to first match if review file not found
+                    emitter.emit("complete", { artifactPath: reviewFilePath || Array.from(matchedFiles.values())[0] });
                     return;
+                }
+            } else {
+                // Original logic for other detection modes
+                for (const watchPath of artifactConfig.watchPaths) {
+                    if (isStopped) {
+                        return;
+                    }
+
+                    let match: string | null = null;
+
+                    // Check if watchPath is a file or directory
+                    try {
+                        const stats = await fs.stat(watchPath);
+                        if (stats.isFile()) {
+                            // Specific file to watch (modify-existing mode)
+                            if (artifactConfig.detectionMode === "modify-existing" || artifactConfig.detectionMode === "both") {
+                                if (process.env.DEBUG) {
+                                    process.stderr.write(`[DEBUG] Polling file: ${watchPath}\n`);
+                                }
+                                match = await checkSpecificFile(watchPath);
+                            }
+                        } else if (stats.isDirectory()) {
+                            // Directory to watch (new-files mode)
+                            if (artifactConfig.detectionMode === "new-files" || artifactConfig.detectionMode === "both") {
+                                if (process.env.DEBUG) {
+                                    process.stderr.write(`[DEBUG] Polling directory: ${watchPath}\n`);
+                                }
+                                match = await checkDirectory(watchPath);
+                            }
+                        }
+                    } catch (err) {
+                        // Path doesn't exist yet, continue to next path
+                        if (process.env.DEBUG) {
+                            const error = err as NodeJS.ErrnoException;
+                            process.stderr.write(`[DEBUG] Path ${watchPath} not accessible: ${error.message}\n`);
+                        }
+                        continue;
+                    }
+
+                    if (match) {
+                        if (process.env.DEBUG) {
+                            process.stderr.write(`[DEBUG] Match found: ${match}\n`);
+                        }
+                        stop();
+                        emitter.emit("complete", { artifactPath: match });
+                        return;
+                    }
                 }
             }
         } catch (error) {

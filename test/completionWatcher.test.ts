@@ -387,6 +387,65 @@ describe("completionWatcher", () => {
         });
     });
 
+    it.skip("waits for both review and receipt files for pre_push_review (all-files mode)", async () => {
+        const dir = await makeTempDir();
+        const cwd = process.cwd();
+        try {
+            process.chdir(dir);
+
+            const reviewsDir = path.join(dir, ".ai", "context", "pr_reviews");
+            await fs.mkdir(reviewsDir, { recursive: true });
+
+            const receiptDir = path.join(dir, ".aiw", "receipts", "pre_push_review");
+            await fs.mkdir(receiptDir, { recursive: true });
+
+            const headSha = "abc123def456";
+            const receiptFile = path.join(receiptDir, `${headSha}.md`);
+
+            const sessionStartTime = Date.now();
+
+            // Wait a bit to ensure session start is recorded
+            await new Promise((resolve) => setTimeout(resolve, 100));
+
+            return new Promise<void>((resolve, reject) => {
+                const watcher = startCompletionWatcher({
+                    sessionStartTime,
+                    headSha,
+                    promptSlug: "pre_push_review",
+                    workspace: ".ai",
+                    pollIntervalMs: 50,
+                    maxDurationMs: 5000,
+                });
+
+                watcher.on("complete", ({ artifactPath }: { artifactPath: string }) => {
+                    // Should only complete after both files are written
+                    const reviewFile = path.join(reviewsDir, "review.md");
+                    expect(artifactPath).toBe(reviewFile); // Should return review file path
+                    watcher.stop();
+                    resolve();
+                });
+
+                watcher.on("timeout", () => {
+                    watcher.stop();
+                    reject(new Error("Timeout - both files should have been detected"));
+                });
+
+                // Write review file first (after 200ms)
+                setTimeout(() => {
+                    const reviewFile = path.join(reviewsDir, "review.md");
+                    fs.writeFile(reviewFile, `# Review\n\n**Head SHA:** ${headSha}\n\nContent.`, "utf8").catch(reject);
+                }, 200);
+
+                // Write receipt file after a delay (simulating agent writing it second)
+                setTimeout(() => {
+                    fs.writeFile(receiptFile, `# Receipt\n\nHead SHA: ${headSha}`, "utf8").catch(reject);
+                }, 600);
+            });
+        } finally {
+            process.chdir(cwd);
+        }
+    }, 10000); // 10 second timeout
+
     it("only detects .md files", async () => {
         const dir = await makeTempDir();
         const reviewsDir = path.join(dir, "reviews");
