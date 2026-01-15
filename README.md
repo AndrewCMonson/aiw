@@ -1,6 +1,6 @@
-# `@andrewmonson/aiw` — repo-local prompt library CLI
+# `@andrewmonson/aiw` — CLI for managing prompts interactively
 
-This repo contains **`aiw`**, a small cross-platform CLI that manages a repo-local **prompt library** under **`.ai/`**.
+This repo contains **`aiw`**, a small cross-platform CLI that manages a repo-local **prompt library** under **`.ai/`**, and a dual-context governance model for scalable, team-safe AI usage.
 
 Prompts can be **copied to clipboard** for manual pasting, or **executed directly** via Cursor Agent CLI.
 
@@ -40,22 +40,24 @@ List prompts:
 aiw list
 ```
 
-Print a prompt (copy/paste into Cursor chat):
+**Option 1: Copy/paste workflow** — Print or copy prompts for manual pasting:
 
 ```bash
+# Print to stdout
 aiw show repo_discover
-```
 
-Copy to clipboard (falls back to printing if clipboard tools aren’t available):
-
-```bash
+# Copy to clipboard (falls back to printing if clipboard tools aren't available)
 aiw copy repo_discover
 ```
 
-Run directly via Cursor Agent (interactive mode):
+**Option 2: Direct CLI interaction** — Run prompts directly via Cursor Agent CLI:
 
 ```bash
+# Interactive mode (recommended) - allows back-and-forth with the agent
 aiw run repo_discover -i
+
+# Non-interactive print mode (for scripting)
+aiw run repo_discover -p
 ```
 
 ## Commands
