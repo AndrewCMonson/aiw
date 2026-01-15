@@ -177,9 +177,10 @@ export function validateModelRecognition(model: string): string {
  * Builds the command-line arguments for the cursor agent command.
  *
  * @param options - Configuration options for the cursor agent
+ * @param prompt - Optional prompt to pass as argument
  * @returns Array of command-line arguments
  */
-export function buildCursorArgs(options: RunCursorAgentOptions): string[] {
+export function buildCursorArgs(options: RunCursorAgentOptions, prompt?: string): string[] {
     const args: string[] = ["agent"];
 
     if (options.model) {
@@ -194,18 +195,43 @@ export function buildCursorArgs(options: RunCursorAgentOptions): string[] {
         }
     }
 
+    // Add prompt as the final argument if provided
+    if (prompt) {
+        args.push(prompt);
+    }
+
     return args;
+}
+
+/**
+ * Escapes a string for safe use in shell commands.
+ * Uses single quotes and escapes any single quotes within the string.
+ *
+ * @param str - The string to escape
+ * @returns Shell-safe escaped string
+ */
+function shellEscape(str: string): string {
+    // Replace single quotes with '\'' (end quote, escaped quote, start quote)
+    return `'${str.replace(/'/g, "'\\''")}'`;
 }
 
 /**
  * Builds the full cursor command string for shell execution.
  *
  * @param options - Configuration options for the cursor agent
+ * @param prompt - Optional prompt to pass as argument
  * @returns The full command string to execute
  */
-export function buildCursorCommand(options: RunCursorAgentOptions): string {
+export function buildCursorCommand(options: RunCursorAgentOptions, prompt?: string): string {
     const args = buildCursorArgs(options);
-    return `cursor ${args.join(" ")}`;
+    let cmd = `cursor ${args.join(" ")}`;
+
+    // Add escaped prompt as final argument
+    if (prompt) {
+        cmd += ` ${shellEscape(prompt)}`;
+    }
+
+    return cmd;
 }
 
 /**
@@ -228,11 +254,41 @@ function getShellConfig(): { shell: string; shellArgs: (cmd: string) => string[]
     };
 }
 
+// PTY write error codes that are expected when process exits
+const PTY_EXPECTED_ERROR_CODES = new Set(["EIO", "EPIPE", "EBADF", "ECONNRESET"]);
+
+/**
+ * Suppresses expected PTY write errors that node-pty logs to console.
+ * Returns a cleanup function to restore original behavior.
+ */
+function suppressPtyWriteErrors(): () => void {
+    const originalConsoleError = console.error;
+    console.error = (...args: unknown[]) => {
+        // Check if this is a PTY write error we want to suppress
+        const firstArg = args[0];
+        if (typeof firstArg === "string" && firstArg.includes("pty write error")) {
+            // Check if it's an expected error code
+            const errorArg = args[1];
+            if (errorArg && typeof errorArg === "object" && "code" in errorArg) {
+                const code = (errorArg as { code: string }).code;
+                if (PTY_EXPECTED_ERROR_CODES.has(code)) {
+                    return; // Suppress this error
+                }
+            }
+        }
+        originalConsoleError.apply(console, args);
+    };
+
+    return () => {
+        console.error = originalConsoleError;
+    };
+}
+
 /**
  * Runs the Cursor Agent CLI with the given prompt.
  *
  * Uses node-pty for cross-platform pseudo-terminal support (Windows, macOS, Linux).
- * The prompt is sent to the agent after it initializes.
+ * In print mode (-p), the prompt is passed as a command-line argument.
  * In interactive mode (-i), the user can review and submit the prompt manually.
  *
  * @param prompt - The prompt to send to the agent
@@ -241,8 +297,13 @@ function getShellConfig(): { shell: string; shellArgs: (cmd: string) => string[]
  * @throws Error if the cursor command cannot be spawned
  */
 export function runCursorAgent(prompt: string, options: RunCursorAgentOptions = {}): Promise<RunCursorAgentResult> {
+    // Suppress expected PTY write errors during execution
+    const restoreConsoleError = suppressPtyWriteErrors();
+
     return new Promise((resolve, reject) => {
-        const cursorCmd = buildCursorCommand(options);
+        // In non-interactive (print) mode, pass prompt as command-line argument
+        // In interactive mode, we'll send it via stdin after a delay
+        const cursorCmd = options.interactive ? buildCursorCommand(options) : buildCursorCommand(options, prompt);
         const { shell, shellArgs } = getShellConfig();
         const delay = (options.promptDelay ?? 1) * 1000;
 
@@ -251,6 +312,24 @@ export function runCursorAgent(prompt: string, options: RunCursorAgentOptions = 
         const stderr = "";
 
         let ptyProcess: pty.IPty;
+        let hasExited = false;
+
+        // Helper function to safely write to PTY
+        const safeWrite = (data: string): void => {
+            if (hasExited) {
+                return;
+            }
+            try {
+                ptyProcess.write(data);
+            } catch (err) {
+                const error = err as NodeJS.ErrnoException;
+                // Ignore expected errors (process already closed/exited)
+                if (!PTY_EXPECTED_ERROR_CODES.has(error.code || "")) {
+                    // Only log unexpected errors
+                    console.error(`PTY write error: ${error.message}`);
+                }
+            }
+        };
 
         try {
             // Spawn through shell to properly resolve PATH and handle symlinks/scripts
@@ -262,6 +341,7 @@ export function runCursorAgent(prompt: string, options: RunCursorAgentOptions = 
                 env: process.env as Record<string, string>,
             });
         } catch (err) {
+            restoreConsoleError();
             const error = err as NodeJS.ErrnoException;
             if (error.code === "ENOENT" || error.message?.includes("ENOENT")) {
                 reject(
@@ -288,18 +368,27 @@ export function runCursorAgent(prompt: string, options: RunCursorAgentOptions = 
 
         // Handle process exit
         ptyProcess.onExit(({ exitCode }) => {
+            hasExited = true;
+
+            // Restore terminal in interactive mode
+            if (options.interactive) {
+                if (process.stdin.isTTY) {
+                    process.stdin.setRawMode(false);
+                }
+                process.stdin.pause();
+            }
+
+            // Restore console.error before resolving
+            restoreConsoleError();
             resolve({ stdout, stderr, exitCode });
         });
 
-        // Send prompt after delay to allow agent to initialize
-        setTimeout(() => {
-            ptyProcess.write(prompt);
-
-            if (!options.interactive) {
-                // In non-interactive mode, submit the prompt immediately
-                ptyProcess.write("\r");
-            }
-        }, delay);
+        // In interactive mode, send prompt via stdin after delay
+        if (options.interactive) {
+            setTimeout(() => {
+                safeWrite(prompt);
+            }, delay);
+        }
 
         // In interactive mode, pipe stdin to the PTY for user interaction
         if (options.interactive) {
@@ -310,20 +399,12 @@ export function runCursorAgent(prompt: string, options: RunCursorAgentOptions = 
             process.stdin.resume();
 
             process.stdin.on("data", (data: Buffer) => {
-                ptyProcess.write(data.toString());
+                safeWrite(data.toString());
             });
 
             // Handle Ctrl+C to gracefully exit
             process.on("SIGINT", () => {
                 ptyProcess.kill();
-            });
-
-            // Restore terminal on exit
-            ptyProcess.onExit(() => {
-                if (process.stdin.isTTY) {
-                    process.stdin.setRawMode(false);
-                }
-                process.stdin.pause();
             });
         }
     });
