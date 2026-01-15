@@ -181,7 +181,9 @@ Run `cursor agent --list-models` for the full list of available models.
 **Requirements:**
 
 - Cursor must be installed with the `cursor` CLI command available in PATH
-- The `expect` command must be available (included by default on macOS; on Linux: `apt install expect`)
+- Node.js >= 20 (for native module support)
+
+**Note:** This command uses `node-pty` for cross-platform pseudo-terminal support. On first install, native module compilation may occur, which requires standard build tools (these are typically pre-installed on most systems).
 
 ### `aiw context:verify`
 

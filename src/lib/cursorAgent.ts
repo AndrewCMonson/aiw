@@ -5,9 +5,10 @@
 
 /**
  * Cursor Agent CLI wrapper for programmatic prompt execution.
+ * Uses node-pty for cross-platform pseudo-terminal support.
  */
 
-import { spawn } from "node:child_process";
+import * as pty from "node-pty";
 
 export interface RunCursorAgentOptions {
     /** If true, runs in print mode (-p) for non-interactive output */
@@ -29,131 +30,173 @@ export interface RunCursorAgentResult {
 }
 
 /**
- * Escapes a string for use in an expect script.
- * Handles double quotes and backslashes.
- * @param str
+ * Validates a model name to prevent command injection.
+ * Only allows alphanumeric characters, dots, hyphens, and underscores.
+ *
+ * @param model - The model name to validate
+ * @returns The validated model name
+ * @throws Error if the model name contains invalid characters
  */
-function escapeForExpect(str: string): string {
-    return str
-        .replace(/\\/g, "\\\\") // Escape backslashes first
-        .replace(/"/g, '\\"') // Escape double quotes
-        .replace(/\$/g, "\\$") // Escape dollar signs
-        .replace(/\[/g, "\\[") // Escape brackets
-        .replace(/\]/g, "\\]");
+export function validateModelName(model: string): string {
+    const sanitized = model.replace(/[^a-zA-Z0-9._-]/g, "");
+    if (sanitized !== model) {
+        throw new Error(`Invalid model name: ${model}. Only alphanumeric characters, dots, hyphens, and underscores are allowed.`);
+    }
+    return sanitized;
 }
 
 /**
- * Builds an expect script for running cursor agent with a prompt.
+ * Builds the command-line arguments for the cursor agent command.
  *
- * Cursor agent requires a TTY, so we use `expect` to provide a pseudo-terminal.
- * The prompt is pasted into the input field and the user presses Enter to submit.
- * @param prompt
- * @param options
+ * @param options - Configuration options for the cursor agent
+ * @returns Array of command-line arguments
  */
-function buildExpectScript(prompt: string, options: RunCursorAgentOptions): string {
-    const delay = options.promptDelay ?? 1;
-    const escapedPrompt = escapeForExpect(prompt);
+export function buildCursorArgs(options: RunCursorAgentOptions): string[] {
+    const args: string[] = ["agent"];
 
-    // Build cursor agent command with flags
-    let cursorCmd = "cursor agent";
     if (options.model) {
-        cursorCmd += ` --model ${options.model}`;
+        const validatedModel = validateModelName(options.model);
+        args.push("--model", validatedModel);
     }
+
     if (options.print) {
-        cursorCmd += " -p";
+        args.push("-p");
         if (options.outputFormat) {
-            cursorCmd += ` --output-format ${options.outputFormat}`;
+            args.push("--output-format", options.outputFormat);
         }
     }
 
-    if (options.interactive) {
-        // Interactive: send prompt, then hand control to user to review and submit
-        return `
-spawn ${cursorCmd}
-sleep ${delay}
-send "${escapedPrompt}"
-interact
-`;
-    } else {
-        // Non-interactive: send prompt and wait (user will need to submit manually or use -i)
-        return `
-set timeout -1
-spawn ${cursorCmd}
-sleep ${delay}
-send "${escapedPrompt}"
-expect eof
-`;
+    return args;
+}
+
+/**
+ * Builds the full cursor command string for shell execution.
+ *
+ * @param options - Configuration options for the cursor agent
+ * @returns The full command string to execute
+ */
+export function buildCursorCommand(options: RunCursorAgentOptions): string {
+    const args = buildCursorArgs(options);
+    return `cursor ${args.join(" ")}`;
+}
+
+/**
+ * Gets the appropriate shell and arguments for the current platform.
+ *
+ * @returns Object with shell path and arguments to execute a command
+ */
+function getShellConfig(): { shell: string; shellArgs: (cmd: string) => string[] } {
+    if (process.platform === "win32") {
+        return {
+            shell: "cmd.exe",
+            shellArgs: (cmd: string) => ["/c", cmd],
+        };
     }
+    // macOS and Linux - use the user's shell or default to bash
+    const userShell = process.env.SHELL || "/bin/bash";
+    return {
+        shell: userShell,
+        shellArgs: (cmd: string) => ["-c", cmd],
+    };
 }
 
 /**
  * Runs the Cursor Agent CLI with the given prompt.
  *
- * Uses `expect` to handle the TTY requirement of cursor agent.
- * The prompt is pasted into the input field after the agent initializes.
- * In interactive mode (-i), press Enter to submit and continue interacting.
+ * Uses node-pty for cross-platform pseudo-terminal support (Windows, macOS, Linux).
+ * The prompt is sent to the agent after it initializes.
+ * In interactive mode (-i), the user can review and submit the prompt manually.
  *
  * @param prompt - The prompt to send to the agent
  * @param options - Optional configuration for print mode and output format
  * @returns Promise resolving with stdout, stderr, and exit code
- * @throws Error if `expect` is not found in PATH
+ * @throws Error if the cursor command cannot be spawned
  */
 export function runCursorAgent(prompt: string, options: RunCursorAgentOptions = {}): Promise<RunCursorAgentResult> {
     return new Promise((resolve, reject) => {
-        const expectScript = buildExpectScript(prompt, options);
+        const cursorCmd = buildCursorCommand(options);
+        const { shell, shellArgs } = getShellConfig();
+        const delay = (options.promptDelay ?? 1) * 1000;
 
         let stdout = "";
-        let stderr = "";
+        // node-pty combines stdout/stderr into a single stream
+        const stderr = "";
 
-        const handleError = (err: NodeJS.ErrnoException): void => {
-            if (err.code === "ENOENT") {
+        let ptyProcess: pty.IPty;
+
+        try {
+            // Spawn through shell to properly resolve PATH and handle symlinks/scripts
+            ptyProcess = pty.spawn(shell, shellArgs(cursorCmd), {
+                name: "xterm-256color",
+                cols: 120,
+                rows: 30,
+                cwd: process.cwd(),
+                env: process.env as Record<string, string>,
+            });
+        } catch (err) {
+            const error = err as NodeJS.ErrnoException;
+            if (error.code === "ENOENT" || error.message?.includes("ENOENT")) {
                 reject(
                     new Error(
-                        "The 'expect' command was not found in PATH. " +
-                            "On macOS, expect is included by default. " +
-                            "On Linux, install it with: apt install expect",
+                        "The 'cursor' command was not found in PATH. " +
+                            "Make sure Cursor is installed and the CLI is available. " +
+                            "You may need to run 'Install cursor command' from the Cursor command palette.",
                     ),
                 );
             } else {
-                reject(new Error(`Failed to spawn expect: ${err.message}`));
+                reject(new Error(`Failed to spawn cursor agent: ${error.message}`));
             }
-        };
+            return;
+        }
 
-        const handleClose = (code: number | null): void => {
-            const exitCode = code ?? 1;
+        // Capture output
+        ptyProcess.onData((data: string) => {
+            stdout += data;
+            if (options.interactive) {
+                // In interactive mode, write directly to stdout for real-time feedback
+                process.stdout.write(data);
+            }
+        });
+
+        // Handle process exit
+        ptyProcess.onExit(({ exitCode }) => {
             resolve({ stdout, stderr, exitCode });
-        };
+        });
 
+        // Send prompt after delay to allow agent to initialize
+        setTimeout(() => {
+            ptyProcess.write(prompt);
+
+            if (!options.interactive) {
+                // In non-interactive mode, submit the prompt immediately
+                ptyProcess.write("\r");
+            }
+        }, delay);
+
+        // In interactive mode, pipe stdin to the PTY for user interaction
         if (options.interactive) {
-            // Interactive mode: inherit stdio for full terminal interaction
-            const child = spawn("expect", ["-c", expectScript], {
-                stdio: "inherit",
-                shell: false,
+            // Enable raw mode to capture all keystrokes
+            if (process.stdin.isTTY) {
+                process.stdin.setRawMode(true);
+            }
+            process.stdin.resume();
+
+            process.stdin.on("data", (data: Buffer) => {
+                ptyProcess.write(data.toString());
             });
 
-            child.on("error", handleError);
-            child.on("close", handleClose);
-        } else {
-            // Non-interactive: capture output while streaming
-            const child = spawn("expect", ["-c", expectScript], {
-                stdio: ["inherit", "pipe", "pipe"],
-                shell: false,
+            // Handle Ctrl+C to gracefully exit
+            process.on("SIGINT", () => {
+                ptyProcess.kill();
             });
 
-            child.stdout.on("data", (data: Buffer) => {
-                const chunk = data.toString();
-                stdout += chunk;
-                process.stdout.write(chunk);
+            // Restore terminal on exit
+            ptyProcess.onExit(() => {
+                if (process.stdin.isTTY) {
+                    process.stdin.setRawMode(false);
+                }
+                process.stdin.pause();
             });
-
-            child.stderr.on("data", (data: Buffer) => {
-                const chunk = data.toString();
-                stderr += chunk;
-                process.stderr.write(chunk);
-            });
-
-            child.on("error", handleError);
-            child.on("close", handleClose);
         }
     });
 }
