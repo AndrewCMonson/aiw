@@ -59,3 +59,6 @@ Desktop.ini
 
 # AI
 .ai/
+
+# AIW receipts (tracked for CI verification)
+!.aiw/receipts/

@@ -214,6 +214,81 @@ async function ensureGitignoreEntry(opts: { repoRoot: string; entry: string }): 
     return { changed: true };
 }
 
+async function ensureReceiptsGitignoreException(opts: { repoRoot: string }): Promise<{ changed: boolean }> {
+    const gitignorePath = path.join(opts.repoRoot, ".gitignore");
+    let current = "";
+    try {
+        current = await fs.readFile(gitignorePath, "utf8");
+    } catch {
+        current = "";
+    }
+
+    const lines = current.split(/\r?\n/);
+    const sectionHeader = "# AIW receipts (tracked for CI verification)";
+    const exceptionEntry = "!.aiw/receipts/";
+
+    // Check if exception already exists
+    const hasException = lines.some((l) => l.trim() === exceptionEntry);
+    if (hasException) {
+        return { changed: false };
+    }
+
+    // Find or create "# AIW receipts" section
+    let sectionStart = -1;
+    let sectionEnd = -1;
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim() === sectionHeader) {
+            sectionStart = i;
+            // Find the end of the section (next section header or end of file)
+            for (let j = i + 1; j < lines.length; j++) {
+                if (lines[j].trim().startsWith("#") && lines[j].trim() !== sectionHeader) {
+                    sectionEnd = j;
+                    break;
+                }
+            }
+            if (sectionEnd === -1) {
+                sectionEnd = lines.length;
+            }
+            break;
+        }
+    }
+
+    if (sectionStart === -1) {
+        // Section doesn't exist - create it at the end
+        // Ensure we have a blank line before the section if file is not empty
+        const needsBlankLine = lines.length > 0 && lines[lines.length - 1].trim() !== "";
+        const newLines = needsBlankLine ? ["", sectionHeader, exceptionEntry] : [sectionHeader, exceptionEntry];
+        const next = [...lines, ...newLines].join("\n") + "\n";
+        await fs.writeFile(gitignorePath, next, "utf8");
+        return { changed: true };
+    }
+
+    // Section exists - add exception entry to it
+    // Check if entry is already in the section (shouldn't happen due to earlier check, but be safe)
+    const inSection = lines.slice(sectionStart, sectionEnd).some((l) => l.trim() === exceptionEntry);
+    if (inSection) {
+        return { changed: false };
+    }
+
+    // Find the last non-empty line in the section to append after it
+    let insertIndex = sectionEnd;
+    for (let i = sectionEnd - 1; i > sectionStart; i--) {
+        if (lines[i].trim() !== "") {
+            insertIndex = i + 1;
+            break;
+        }
+    }
+    // If section only has the header, insert after header
+    if (insertIndex === sectionEnd && sectionStart + 1 >= sectionEnd) {
+        insertIndex = sectionStart + 1;
+    }
+
+    lines.splice(insertIndex, 0, exceptionEntry);
+    const next = lines.join("\n") + "\n";
+    await fs.writeFile(gitignorePath, next, "utf8");
+    return { changed: true };
+}
+
 async function promptYesNo(question: string): Promise<boolean> {
     const rl = readline.createInterface({ input, output });
     try {
@@ -303,6 +378,11 @@ export async function runSetup(opts: {
             }
         }
     }
+
+    // Always ensure .aiw/receipts/ exception is in .gitignore (required for receipt mechanism)
+    await ensureReceiptsGitignoreException({
+        repoRoot: process.cwd(),
+    });
 
     // Always create docs/PROJECT_CONTEXT.md if it doesn't exist
     const repoRoot = process.cwd();

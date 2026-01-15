@@ -36,10 +36,6 @@ echo "$INPUT" | ./scripts/pre-push-context-check.sh || exit $?
 # AIW Pre-Push Review Gate (soft + visible)
 # ---------------------------------------
 
-# ---------------------------------------
-# AIW Pre-Push Review Gate (soft + visible)
-# ---------------------------------------
-
 # Determine current HEAD SHA (used to verify freshness)
 HEAD_SHA=$(git rev-parse HEAD 2>/dev/null)
 if [ -z "$HEAD_SHA" ]; then
@@ -47,58 +43,84 @@ if [ -z "$HEAD_SHA" ]; then
   exit 0
 fi
 
-REVIEWS_DIR=".ai/context/pr_reviews"
+RECEIPT_DIR=".aiw/receipts/pre_push_review"
+RECEIPT_FILE="${RECEIPT_DIR}/${HEAD_SHA}.md"
 
-# Helper: does a review exist for this HEAD?
-has_review_for_head() {
-  if [ ! -d "$REVIEWS_DIR" ]; then
-    return 1
-  fi
-
-  if grep -R --quiet "$HEAD_SHA" "$REVIEWS_DIR"/*.md 2>/dev/null; then
-    return 0
-  fi
-
-  return 1
+# Helper: does a receipt exist for this HEAD?
+has_receipt_for_head() {
+  [ -f "$RECEIPT_FILE" ]
 }
 
-# Helper: detect intentional skip via commit message
+# Helper: detect intentional skip via last commit message
 has_aiw_skip_commit() {
   git log -1 --pretty=%B | grep -q "\[aiw-skip\]"
 }
 
-# If review already exists, continue silently
-if has_review_for_head; then
-  echo "✅ AIW pre-push review found for HEAD ($HEAD_SHA)."
-  exit 0
-fi
+# Helper: find newest review artifact that references HEAD_SHA (preferred)
+find_most_recent_artifact() {
+  local reviews_dir=".ai/context/pr_reviews"
 
-# If commit explicitly declares skip, allow but warn
-if has_aiw_skip_commit; then
-  echo "⚠️  AIW pre-push review intentionally skipped via [aiw-skip]."
-  echo "    This will be visible in CI for this PR."
-  exit 0
-fi
+  if [ ! -d "$reviews_dir" ]; then
+    echo ""
+    return
+  fi
 
-# If explicit env var bypass is set, allow but warn (stronger wording)
-if [ -n "$AIW_SKIP" ]; then
-  echo "⚠️  AIW pre-push review bypassed via AIW_SKIP=$AIW_SKIP."
-  echo "    Prefer using [aiw-skip] in commit messages for auditability."
-  echo "    CI will flag this as missing unless [aiw-skip] is present."
-  exit 0
-fi
+  # Prefer the newest artifact that references HEAD_SHA (prevents false receipts)
+  local newest=""
+  newest=$(ls -t "$reviews_dir"/*.md 2>/dev/null | head -50 | while read -r f; do
+    if grep -q "$HEAD_SHA" "$f" 2>/dev/null; then
+      echo "$f"
+      break
+    fi
+  done)
 
-# If aiw isn't installed, warn but don't block
-if ! command -v aiw >/dev/null 2>&1; then
-  echo "⚠️  aiw command not found. Skipping AIW pre-push review gate."
-  echo "    Install AIW to enable self-review enforcement."
-  exit 0
-fi
+  # Fallback: newest file (if sha-based detection fails)
+  if [ -z "$newest" ]; then
+    newest=$(ls -t "$reviews_dir"/*.md 2>/dev/null | head -1)
+  fi
 
-echo ""
-echo "🧠 AIW pre-push self-review is missing for current HEAD:"
-echo "    $HEAD_SHA"
-echo ""
-echo "Choose an action:"
-echo "  [y] Run self-review now (recommended)"
-echo "  [s] Skip this push by
+  echo "$newest"
+}
+
+# Helper: extract risk level from artifact (optional)
+extract_risk_level() {
+  local artifact_path="$1"
+
+  if [ -z "$artifact_path" ] || [ ! -f "$artifact_path" ]; then
+    echo "(not found)"
+    return
+  fi
+
+  # Try a few common patterns; if none match, return (not found)
+  # This is intentionally forgiving to avoid coupling to exact phrasing.
+  local line=""
+  line=$(grep -iE "(^|\b)risk(\b|[^a-z])" "$artifact_path" 2>/dev/null | head -1)
+
+  # If we found something, normalize to low/medium/high if possible
+  case "$(echo "$line" | tr '[:upper:]' '[:lower:]')" in
+    *low*) echo "low" ;;
+    *med*|*medium*) echo "medium" ;;
+    *high*) echo "high" ;;
+    *) echo "(not found)" ;;
+  esac
+}
+
+# Helper: create receipt file for current HEAD
+create_receipt_for_head() {
+  local timestamp
+  timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+
+  local artifact_path
+  artifact_path=$(find_most_recent_artifact)
+
+  local risk_level
+  risk_level=$(extract_risk_level "$artifact_path")
+
+  mkdir -p "$RECEIPT_DIR"
+
+  local artifact_display="$artifact_path"
+  if [ -z "$artifact_display" ]; then
+    artifact_display="(not found)"
+  fi
+
+  cat > "$RECEIPT
